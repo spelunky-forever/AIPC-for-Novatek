@@ -28,40 +28,26 @@ Before reporting the whole project as complete:
 > Fill these in once. All `{VAR}` references in this document use these values. If a value is not set, the default shown in its comment applies.
 
 ```
-PROJECT_NAME  = <!-- your project name -->
-MODEL_NAME    = <!-- model identifier, e.g. yolov8n, whisper-tiny, lprnet -->
-QAIRT_ENV_SETUP = <!-- path to the project-level env-setup script; sources {QAIRT_ROOT}/bin/envsetup.sh (or .ps1), activates the QAIRT Python venv, and extends PATH / proxy as needed -->
+PROJECT_NAME  = mobilenet_v2_bringup
+MODEL_NAME    = mobilenet_v2
+QAIRT_ENV_SETUP = /home/spelunky-forever/workplace/AIPC-for-Novatek/env_setup.sh
 
-FLOW          = <!-- QNN  or  SNPE(default) -->
-OPTIMIZE_LAYOUT = <!-- YES / NO (default NO); QNN only. If YES, run final optimization pass by removing --preserve_io -->
-ACCURACY_REPORT = <!-- YES / NO (default NO); optional final accuracy report phase after profiling and before skill evolution. If YES, consolidate validation/profiling artifacts into an accuracy report. -->
-EVOLVE        = <!-- YES / NO (default NO); post-project skill self-improvement phase. If YES, run evolve phase after all main phases complete. See references/evolve.md -->
-EVOLVE_MODE   = <!-- inherit / batch / interactive (default inherit); controls whether evolve applies verified skill changes automatically or asks user before applying. inherit uses MODE. -->
-AIPC_SKILL_DIR = <!-- path to the aipc skill checkout to update; global or project-local; must be a git repository before evolve applies changes -->
+FLOW          = QNN
+OPTIMIZE_LAYOUT = NO
+ACCURACY_REPORT = YES
+EVOLVE        = NO
+EVOLVE_MODE   = inherit
+AIPC_SKILL_DIR = /home/spelunky-forever/workplace/AIPC-for-Novatek/.cline/skills/QAI-Runner-Skill
 
-SRC_FRAMEWORK = <!-- PyTorch(default) /   ONNX -->
-TARGET_DEVICE = <!-- ARM WIN  (QCOM) / x86 Linux/ ARM Linux (QCOM) -->
+SRC_FRAMEWORK = PyTorch
+TARGET_DEVICE = x86 Linux
 
-PRECISION     = <!-- FP32 / FP16 (default)/ BF16(experimental) / INT8 / A16W8 /INT4/ A8W4 -->
-QUANT_TOOL    = <!-- QAIRT (default) / AIMET
-                     QAIRT: uses aipc_convert_int.py / snpe-dlc-quant — simple, works on all platforms.
-                     AIMET: uses AIMET QuantSim — runs the same PRECISION as configured, but adds
-                            advanced PTQ techniques (CLE, AdaRound, SeqMSE) for higher accuracy.
-                            Produces .onnx + .encodings → handed to QAIRT converter via
-                            --quantization_overrides. Linux only (x86 or ARM Linux host required).
-                     Only relevant when PRECISION is INT8 / A16W8 / INT4 / A8W4. -->
-HOST_DEVICE     = <!-- ARM WIN  (default )/  X86 LINUX  /  ARM LINUX -->
-CONTEXT_BINARY_GEN = <!-- YES (default) / NO
-                         YES: generate a hardware-specific HTP context binary on the HOST (x86) for the target SoC, then deploy to target (required on ARM WIN; recommended for fixed-SoC deployment)
-                         NO:  skip context binary generation (use raw .so / .dll directly; only valid when on-device JIT compilation is acceptable) -->
+PRECISION     = FP32
+QUANT_TOOL    = QAIRT
+HOST_DEVICE     = X86 LINUX
+CONTEXT_BINARY_GEN = NO
 
-RETMOE_DEVICE_INFO = <!-- Optional to configure. Leave empty for local inference.
-                         If set, remote target inference is MANDATORY for final acceptance (host-only validation is not sufficient).
-                         For remote (target-device) inference, you must provide a file (text/YAML) that records:
-                           a) SSH information (host/user/port and key path if needed)
-                           b) Target working directory (where inference is executed)
-                           c) QAIRT setup script path on the target (user-provided; sets env vars / activates venv / initializes QAIRT)
-                      -->
+RETMOE_DEVICE_INFO = 
 
 # Required when PRECISION is INT8/A16W8/INT4/A8W4 (i.e., not FP32/FP16).
 # Accepted formats:
@@ -72,51 +58,34 @@ RETMOE_DEVICE_INFO = <!-- Optional to configure. Leave empty for local inference
 # - If source is images, convert ALL valid samples to float32 .raw and generate CALIB_LIST.
 # - If source is raw folder, include ALL valid raws in CALIB_LIST.
 # - If source is list file, validate entries and use it directly.
-CALIBRATION_DATA = <!-- calibration source: image folder / dateset from internet / list file -->
-CALIB_RAW_DIR    =  <!-- generated raw output dir when source is images. calib_data(dafault) -->
-CALIB_LIST       = <!-- one absolute sample path per line.  calibration_list.txt (default)-->
+CALIBRATION_DATA = 
+CALIB_RAW_DIR    = calib_data
+CALIB_LIST       = calibration_list.txt
 
 
-OUTPUT_DIR    = <!-- e.g. qairt_output(default)-->
-OWNER         = <!-- name / team / aipc(default)-->
+OUTPUT_DIR    = qairt_output
+OWNER         = aipc
 START_TIME    = 2026-09-05 17:29
-END_TIME      = <!-- YYYY-MM-DD HH:MM  — filled in by Validation Agent at Phase 7.5 -->
-WORK_TIME     = <!-- e.g. 2h 30m       — END_TIME minus START_TIME -->
-python venv   = <!-- qairt (default) | project (only if qairt venv is insufficient) -->
-python lib install = <!-- ask (default) | yes | no  — always ask before pip install -->
+END_TIME      = 
+WORK_TIME     = 
+python venv   = project
+python lib install = no
 
 
-QAIRT_ROOT    = <!--if QAIRT_ENV_SETUP is provided, derive this value from $QAIRT_SDK_ROOT after sourcing that script. /absolute path to the versioned QAIRT SDK root>
+QAIRT_ROOT    = /home/spelunky-forever/workplace/AIPC-for-Novatek/toolchains/qairt/2.45.0.260326/qairt/2.45.0.260326
 
-ONNX_FILE     = {MODEL_NAME}.onnx
+ONNX_FILE     = mobilenet_v2.onnx
 # For multi-component pipelines (e.g. diffusion, Whisper, CLIP), replace the single
 # ONNX_FILE with a component list and shared output directory:
 # COMPONENTS   = <!-- comma-separated component names, e.g. text_encoder, unet, vae_decoder -->
 # ONNX_DIR     = <!-- directory for all component ONNX files, e.g. onnx_models -->
 # When COMPONENTS is set, all Phase 1–5 tasks iterate over each component.
 # See references/multi_component_pipeline.md for the full workflow.
-HOST_ARCH      = <!-- can derived from HOST_DEVICE:
-                     ARM WIN    → x86_64-windows-msvc  (emulation — qairt ARM WIN toolchain uses x86_64 emulation)
-                     X86 LINUX  → x86_64-linux-clang
-                     ARM LINUX  → aarch64-linux-gcc -->
+HOST_ARCH      = x86_64-linux-clang
 
                      
-SHELL         = <!-- derived from HOST_DEVICE:
-                     ARM WIN    → powershell
-                     X86 LINUX  → bash
-                     ARM LINUX  → bash -->
-TARGET_ARCH   = <!-- derived from CONTEXT_BINARY_GEN and TARGET_DEVICE:
-                     if TARGET_DEVIC is ARM WIN, ignore CONTEXT_BINARY_GEN  :
-                        ARM WIN    → windows-x86_64 (emulation — qairt ARM WIN toolchain uses x86_64 emulation)
-                        ### windows-aarch64 is for old method, not used now .
-                     If CONTEXT_BINARY_GEN = YES (default):
-                        X86 LINUX → x86_64-linux-clang
-                        ARM LINUX → x86_64-linux-clang (the context binary generation process utilizes the host toolchain as an emulation environment)
-                     If CONTEXT_BINARY_GEN = NO:
-                       TARGET_ARCH is derived from TARGET_DEVICE target OS/arch:
-                       ARM Linux  → aarch64-ubuntu-gcc9.4
-                       x86 Linux  → x86_64-linux-clang 
-                       -->
+SHELL         = bash
+TARGET_ARCH   = x86_64-linux-clang
                        
 
 
