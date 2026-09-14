@@ -1,1 +1,11 @@
 /toolchains
+__pycache__/
+*.py[cod]
+_dryrun_test/
+qairt_output/
+*.so
+*.bin
+*.onnx
+aipc
+*.npy
+real_inference_output.txt
