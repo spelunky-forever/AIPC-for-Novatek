@@ -12,12 +12,12 @@
 
 Before reporting the whole project as complete:
 
-- [ ] Main configured flow is complete and accepted on the required target (`RETMOE_DEVICE_INFO` remote target if set).
-- [ ] `REPORT.md` exists and links the final validation evidence.
-- [ ] Config completion fields are filled: `END_TIME`, `WORK_TIME`, and final pass/fail status.
-- [ ] If `ACCURACY_REPORT = YES`, Phase R is complete and linked from `REPORT.md`.
-- [ ] If `EVOLVE = YES`, Phase E is complete: candidates reviewed by Verification Subagent, interactive confirmations handled if applicable, skill repo committed for applied changes, and the Skill Evolution Summary table filled.
-- [ ] If `EVOLVE = YES` but no skill changes are applied, record the explicit skip/reject reason in the Skill Evolution Summary before closing.
+- [x] Main configured flow is complete and accepted on the required target (`RETMOE_DEVICE_INFO` empty → local x86 Linux accepted; QNN-6 PASS 3/3).
+- [x] `REPORT.md` exists and links the final validation evidence.
+- [x] Config completion fields are filled: `END_TIME = 2026-09-06 22:05`, `WORK_TIME = 28h 36m`, final status = PASS.
+- [x] If `ACCURACY_REPORT = YES`, Phase R is complete and linked from `REPORT.md` (`ACCURACY_REPORT.md` written and linked).
+- [~] If `EVOLVE = YES`, Phase E is complete... — **N/A** (`EVOLVE = NO`, Phase E disabled).
+- [~] If `EVOLVE = YES` but no skill changes are applied... — **N/A** (`EVOLVE = NO`).
 
 **Closeout rule**: Do not claim the full plan is complete while any enabled post-project phase (`ACCURACY_REPORT`, `EVOLVE`) is still unrun, awaiting confirmation, blocked, or undocumented.
 
@@ -66,13 +66,13 @@ CALIB_LIST       = calibration_list.txt
 OUTPUT_DIR    = qairt_output
 OWNER         = aipc
 START_TIME    = 2026-09-05 17:29
-END_TIME      = 
-WORK_TIME     = 
+END_TIME      = 2026-09-06 22:05
+WORK_TIME     = 28h 36m 
 python venv   = project
-python lib install = no
+python lib install = yes <!-- 2026-09-06 21:33: pip install numpy==1.26.4 in conda env aipc (B2, user-approved) to align with QAIRT 2.45 dependency matrix (check-python-dependency: numpy 1.26.4). Fixes pandas 2.0.1 ABI crash in qnn-onnx-converter. -->
 
 
-QAIRT_ROOT    = /home/spelunky-forever/workplace/AIPC-for-Novatek/toolchains/qairt/2.45.0.260326/qairt/2.45.0.260326
+QAIRT_ROOT    = /home/spelunky-forever/workplace/AIPC-for-Novatek/toolchains/qairt/2.45.0.260326/
 
 ONNX_FILE     = mobilenet_v2.onnx
 # For multi-component pipelines (e.g. diffusion, Whisper, CLIP), replace the single
@@ -201,11 +201,11 @@ Is PRECISION INT8 / A16W8 / INT4 / A8W4?
 > **Update these fields as you discover and patch unsupported operators:**
 
 ```
-PATCH_NEEDED       = <!-- Yes / No — after dry-run inspection -->
-PATCH_OPS          = <!-- comma-separated list, e.g., Mod, Einsum -->
-PATCH_APPROACH     = <!-- 1 / 2 / 3 — after selecting strategy -->
-PATCH_ITERATIONS   = <!-- 0 — increment after each patch attempt -->
-PATCH_LAST_UPDATE  = <!-- YYYY-MM-DD HH:MM --
+PATCH_NEEDED       = No <!-- Phase 2 op review: MobileNetV2 uses standard ops only (Conv/BN/Relu/Clip->ReLU6/Gemm); Phase 3 dry-run to confirm -->
+PATCH_OPS          = <!-- none so far -->
+PATCH_APPROACH     = <!-- N/A -->
+PATCH_ITERATIONS   = <!-- 0 -->
+PATCH_LAST_UPDATE  = <!-- 2026-09-06 15:37 --
 ```
 
 ### Model-Specific Notes
@@ -213,14 +213,14 @@ PATCH_LAST_UPDATE  = <!-- YYYY-MM-DD HH:MM --
 > Fill these in during Phase 1 / Phase 2 discovery:
 
 ```
-MODEL_STRUCTURE = <!-- generic / transformer_decoder / custom -->
-PYTORCH_ADAPTATION_NEEDED = <!-- Yes / No -->
-PYTORCH_ADAPTATION_NOTES  = <!-- wrappers, cache handling, fixed-shape assumptions, or "none" -->
+MODEL_STRUCTURE = generic
+PYTORCH_ADAPTATION_NEEDED = No
+PYTORCH_ADAPTATION_NOTES  = MobileNetV2 = generic CNN (Conv/BN/ReLU6->Clip/GAP/Linear). No model-side wrappers or operator changes needed. Baseline: seed-42 random input [1,3,224,224] f32 -> golden (1,1000) f32, finite, 1000 nonzero. Saved input.npy / golden_output.npy.
 
-INPUT_NAME    = <!-- e.g. images -->
-INPUT_SHAPE   = <!-- e.g. [1, 3, 640, 640] -->
-OUTPUT_NAMES  = <!-- e.g. output0, output1 -->
-OPSET         = <!-- e.g. 13 -->
+INPUT_NAME    = input
+INPUT_SHAPE   = [1, 3, 224, 224]
+OUTPUT_NAMES  = output
+OPSET         = 13
 ```
 
 > If `MODEL_STRUCTURE = transformer_decoder`, follow `skills/aipc-toolkit/references/pytorch_modification.md` for PyTorch-side adaptation and `skills/aipc-toolkit/references/transformer_models_qairt.md` for ONNX prefill/decode export and validation contracts.
@@ -399,26 +399,23 @@ OPSET         = <!-- e.g. 13 -->
 
 ### Tasks
 
-- [ ] **1.1** Identify whether PyTorch adaptation is required
-  - Set `MODEL_STRUCTURE` to `generic`, `transformer_decoder`, or `custom`
-  - Set `PYTORCH_ADAPTATION_NEEDED`
-  - Record key shape and wrapper assumptions in `PYTORCH_ADAPTATION_NOTES`
+- [x] **1.1** Identify whether PyTorch adaptation is required
+  - `MODEL_STRUCTURE = generic` ✅
+  - `PYTORCH_ADAPTATION_NEEDED = No` ✅
+  - shape assumptions recorded in `PYTORCH_ADAPTATION_NOTES` (input [1,3,224,224] f32, output [1,1000])
 
-- [ ] **1.2** Inspect model-side NPU constraints
-  - For generic models: identify forward-path changes or wrapper needs that preserve semantics
-  - For transformer decoder models: identify prefill/decode split, KV-cache shapes, cache type, and fixed-shape decode bring-up target
+- [x] **1.2** Inspect model-side NPU constraints
+  - Generic CNN (Conv/BN/ReLU6/GAP/Linear) — no forward-path changes or wrapper needs; semantics preserved as-is
 
-- [ ] **1.3** Implement PyTorch wrapper or adaptation code
-  - Do not modify installed package source files
-  - Keep model semantics unchanged
-  - If a required change alters semantics, stop under Blocking Condition B4
+- [x] **1.3** Implement PyTorch wrapper or adaptation code
+  - **Not needed** (generic model). No library source modifications; no semantic changes; B4 not triggered.
 
-- [ ] **1.4** Validate adapted PyTorch outputs before ONNX export
-  - Check output shapes, dtypes, finite values, and nonzero counts
-  - For transformer decoder models, validate prefill and decode wrappers separately
-  - Record validation notes in `PYTORCH_ADAPTATION_NOTES`
+- [x] **1.4** Validate adapted PyTorch outputs before ONNX export
+  - Baseline validated: output shape (1,1000), dtype fp32, finite=True, nonzero=1000
+  - Golden artifacts saved: `input.npy`, `golden_output.npy` (script: `baseline_mobilenet_v2.py`)
 
-- [ ] **1.5** Hand off export-ready model entry point or wrappers to Phase 2
+- [x] **1.5** Hand off export-ready model entry point or wrappers to Phase 2
+  - Handed off: `torchvision.models.mobilenet_v2(weights=DEFAULT, eval mode)` → consumed by `export_onnx.py`
 
 **Exit Criteria**: NPU model adaptation is either marked not needed (`PYTORCH_ADAPTATION_NEEDED = No`) or all model-side changes are validated and the export-ready entry point is handed off to Phase 2. Phase 2 must not start until this exit criteria is met.
 
@@ -431,42 +428,33 @@ OPSET         = <!-- e.g. 13 -->
 
 ### Tasks
 
-- [ ] **1.1** Review `{MODEL_NAME}` architecture for QNN-incompatible operators
-  - ⚠️ **Gate**: Confirm Phase 1 exit criteria is met before starting. If `PYTORCH_ADAPTATION_NEEDED = Yes`, the adapted model entry point from Phase 1 must be used — do not export from the original unmodified model.
-  - Known problematic ops: `Einsum`, custom attention, `GridSample`, `ScatterND`
-  - For transformer decoder models, use `transformer_models_qairt.md` for the prefill/decode ONNX contract instead of exporting only a generic full-forward graph
-  - Update `PATCH_NEEDED` and `PATCH_OPS` in Variables above
+- [x] **1.1** Review `{MODEL_NAME}` architecture for QNN-incompatible operators
+  - ⚠️ **Gate**: Phase 1 exit criteria met (`PYTORCH_ADAPTATION_NEEDED = No`, export from original unmodified model) ✅
+  - Known problematic ops to watch: `Einsum`, custom attention, `GridSample`, `ScatterND` — **none present** in MobileNetV2 ✅
+  - Not a transformer decoder → generic ONNX export path
+  - Updated `PATCH_NEEDED = No` in Variables above ✅
 
-- [ ] **1.2** Write `export_onnx.py` with in-memory operator patches (if `PATCH_NEEDED = Yes`)
-  ```python
-  # Patch in-memory only — never modify library source code
-  # patch_model_for_qnn(model) before torch.onnx.export()
-  ```
+- [x] **1.2** Write `export_onnx.py` with in-memory operator patches (if `PATCH_NEEDED = Yes`)
+  - **No patches required** (`PATCH_NEEDED = No`). `export_onnx.py` created in repo root.
 
-- [ ] **1.3** Export `{MODEL_NAME}` to `{ONNX_FILE}`
-  ```python
-  torch.onnx.export(model, dummy_input, "{ONNX_FILE}",
-                    opset_version={OPSET},
-                    input_names=["{INPUT_NAME}"],
-                    output_names=["{OUTPUT_NAMES}"])
-  ```
-  > If `{PRECISION}=BF16`, cast the model and dummy input to `torch.bfloat16` before export. Treat BF16 ONNX export as experimental and validate end-to-end.
+- [x] **1.3** Export `{MODEL_NAME}` to `{ONNX_FILE}`
+  - Ran: `torch.onnx.export(..., opset_version=13, do_constant_folding=True, dynamic_axes=None)` (fixed shapes)
+  - Output: `mobilenet_v2.onnx` (13,989,177 bytes, single self-contained file)
+  - `{PRECISION}=FP32` → no bf16 cast needed
 
-- [ ] **1.4** Validate: `onnx.checker.check_model("{ONNX_FILE}")`
+- [x] **1.4** Validate: `onnx.checker.check_model("{ONNX_FILE}")` ✅ PASSED
 
-- [ ] **1.5** Simplify with `onnxsim`
-  ```bash
-  python -m onnxsim {ONNX_FILE} {ONNX_FILE}
-  ```
+- [x] **1.5** Simplify with `onnxsim`
+  - Ran against `mobilenet_v2.onnx` via `validate_onnx.py` → **simplified and saved** ✅
 
-- [ ] **1.6** ONNX inference sanity check — compare output with {SRC_FRAMEWORK} baseline
-  > If `RETMOE_DEVICE_INFO` is set, skip local quick-smoke sanity inference at this step and perform target-device inference first in Phase 6.
+- [x] **1.6** ONNX inference sanity check — compare output with {SRC_FRAMEWORK} baseline
+  - ORT CPU inference on `input.npy` → output (1,1000)
+  - Cosine similarity vs `golden_output.npy` = **1.00000012** (≥ 0.95 ✅ PASS)
+  - `RETMOE_DEVICE_INFO` empty → local sanity check performed
 
-- [ ] **1.7** Iterative patching (if needed)
-  - If dry-run shows new unsupported ops after patch → repeat Tasks 1.2–1.6
-  - Continue patching until ALL unsupported operators are resolved (unlimited iterations)
-  - Record ALL patched operators in `PATCH_OPS` (comma-separated list)
-  - Escalate only when: (a) no replacement pattern exists for an operator (B7), or (b) patch would change model semantics (B4)
+- [x] **1.7** Iterative patching (if needed)
+  - **No patches needed** — op review found only standard ops; no new unsupported ops discovered; iterations = 0
+  - Phase 3 converter dry-run will provide the final confirmation
 
 **Exit Criteria**: `{ONNX_FILE}` passes `onnx.checker` and produces correct outputs.
 
@@ -479,26 +467,24 @@ OPSET         = <!-- e.g. 13 -->
 
 ### Tasks
 
-- [ ] **2.1** Inspect `{ONNX_FILE}` I/O shapes and dtypes
+- [x] **2.1** Inspect `{ONNX_FILE}` I/O shapes and dtypes
   ```bash
-  python skills/aipc-toolkit/scripts/aipc_inspect_onnxio.py {ONNX_FILE}
+  python skills/aipc-toolkit/scripts/aipc_inspect_onnxio.py mobilenet_v2.onnx
   ```
-  > Record results in `INPUT_NAME`, `INPUT_SHAPE`, `OUTPUT_NAMES` in Variables above.
+  ✅ Ran 2026-09-06 21:30 — result: `INPUT_NAME = input`, `INPUT_SHAPE = [1, 3, 224, 224]`, `OUTPUT_NAMES = output` (already recorded in Variables above). Generated `mobilenet_v2.yaml`.
 
-- [ ] **2.2** Run converter dry-run to detect unsupported operators
-  ```bash
-  # Flow A — QNN
-  {QAIRT_ROOT}/bin/x86_64-linux-clang/qnn-onnx-converter \
-    --input_network {ONNX_FILE} --dry_run
+- [x] **2.2** Run converter dry-run to detect unsupported operators
+  ✅ Ran 2026-09-06 21:33: `qnn-onnx-converter --input_network mobilenet_v2.onnx --dry_run`
+  - 35× `Clip: unsupported version` flagged in dry-run table (all ReLU6 nodes; Clip-11 inputs-min/max form at opset 13)
+  - **Verified benign**: actual (non-dry-run) conversion succeeded (`Conversion complete!` → `mobilenet_v2.cpp/.bin/_net.json` in `_dryrun_test/`).
+    Converter logs `WARNING_OP_VERSION_NOT_SUPPORTED` (expected Clip versions [1,6,11,12]) → **warnings, not errors** (per `operator_patching.md` rule #5: dry-run warnings are not always blockers; test actual conversion).
+  - Ops present: Conv 52, Clip 35, Add 10, GlobalAveragePool 1, Flatten 1, Gemm 1 — all QNN-IR compatible. GEMM auto-interpreted as FC (benign).
 
-  # Flow B — SNPE
-  {QAIRT_ROOT}/bin/x86_64-linux-clang/qairt-converter \
-    --input_network {ONNX_FILE} --dry_run
-  ```
-
-- [ ] **2.3** Document and resolve issues found
-  - Issue 1: <!-- description → resolution -->
-  - Issue 2: <!-- description → resolution -->
+- [x] **2.3** Document and resolve issues found
+  - Issue 1: Converter C-extension crashed — `libpython3.10.so.1.0: cannot open shared object file` + `ValueError: numpy.dtype size changed` (pandas 2.0.1 ABI vs numpy 2.2.6 in conda env `aipc`).
+    → Resolution: add `$CONDA_PREFIX/lib` to `LD_LIBRARY_PATH`; `pip install numpy==1.26.4` (B2, user-approved 2026-09-06 21:31). QAIRT `check-python-dependency` now aligned.
+  - Issue 2: Dry-run flags `Clip: unsupported version` on 35 ReLU6 nodes.
+    → Resolution: verified via actual conversion — `WARNING_OP_VERSION_NOT_SUPPORTED` is a warning; converter auto-maps Clip to QNN clamp/`relu6` and conversion completes. No patch required. `PATCH_NEEDED = No` confirmed.
 
 **Exit Criteria**: No unsupported operators. All shapes confirmed correct.
 
@@ -529,27 +515,30 @@ OPSET         = <!-- e.g. 13 -->
 
 ### Tasks
 
-- [ ] **QNN-4A.1** Run FP conversion
+- [x] **QNN-4A.1** Run FP conversion
   ```bash
   python skills/aipc-toolkit/scripts/aipc_convert_fp.py \
-    --onnx {ONNX_FILE} \
-    --output-root {OUTPUT_DIR} \
-    --precision <!-- 16 or 32 --> \
+    --onnx mobilenet_v2.onnx \
+    --output-root qairt_output \
+    --precision 32 \
     --preserve-io-mode datatype \
-    --target-arch {TARGET_ARCH}
+    --target-arch x86_64-linux-clang
   ```
-  > If target runtime shows FP16/dtype compatibility issues, rerun with `--preserve-io-mode layout`.
-  > Do **not** use `--preserve-io-mode none` in Phase 4A.
+  ✅ Ran 2026-09-06 21:44 via skill wrapper (added `--no-cleanup` to retain intermediates). Result: `Converted: 1, Failed: 0`.
+  - Converter step: `--input_network mobilenet_v2.onnx --output_path mobilenet_v2.cpp --float_bitwidth 32 --preserve_io`
+  - libgen step: `qnn-model-lib-generator -c mobilenet_v2.cpp -b mobilenet_v2.bin -o qairt_output/test_libs_mobilenet_v2_fp32_x86_64-linux-clang -t x86_64-linux-clang`
 
-- [ ] **QNN-4A.2** Verify conversion outputs in `{OUTPUT_DIR}`:
-  - `{MODEL_NAME}.bin` ✓
-  - `{MODEL_NAME}.cpp` ✓
-  - `{MODEL_NAME}_net.json` ✓
+- [x] **QNN-4A.2** Verify conversion outputs in `{OUTPUT_DIR}`:
+  - `mobilenet_v2.bin` ✅ (14,028,800 B, repo root — retained via `--no-cleanup`)
+  - `mobilenet_v2.cpp` ✅ (678,305 B, repo root)
+  - `mobilenet_v2_net.json` ✅ (340,458 B, repo root)
 
-- [ ] **QNN-4A.3** Compile shared library via libgen
-  - Output: `lib{MODEL_NAME}.so` (Linux) / `lib{MODEL_NAME}.dll` (Windows)
+- [x] **QNN-4A.3** Compile shared library via libgen (wrapper ran it internally)
+  - Output: `qairt_output/test_libs_mobilenet_v2_fp32_x86_64-linux-clang/x86_64-linux-clang/libmobilenet_v2.so` ✅
+  - Arch verified: `file` → **ELF 64-bit LSB shared object, x86-64** — matches `{TARGET_ARCH} = x86_64-linux-clang` ✅
 
-- [ ] **QNN-4A.4** Verify library file is non-zero size
+- [x] **QNN-4A.4** Verify library file is non-zero size
+  - ✅ `libmobilenet_v2.so` = 14,322,248 B (non-zero), executable perms
 
 **Exit Criteria**: `lib{MODEL_NAME}.so` compiled successfully.
 
@@ -749,6 +738,8 @@ PY
 **Agent**: Context Binary Agent  
 **Reference**: `skills/aipc-toolkit/references/host_context_binary_gen.md`
 
+> **Status: ✅ Done (skipped by config, 2026-09-06).** `CONTEXT_BINARY_GEN = NO` and the acceptance target is **x86 Linux** (same machine, CPU backend — no HTP SoC deployment, no remote device). Per AGENTS.md, context binary is **optional on Linux**; the `.so` model library is used directly for inference. See Issue Log #6.
+
 > Context binary generation runs on the **host** (x86 Linux or x86 Windows), not on the target device.
 > The host uses `qnn-context-binary-generator` with `soc_id`/`dsp_arch` config to compile a binary for the target SoC.
 > The resulting `.bin` is then deployed to the target for inference.
@@ -937,36 +928,30 @@ real_inference_output.txt or equivalent log must include:
 > restores ONNX output order via the `.yaml` file. Direct `QNNContext` returns HTP-internal order —
 > outputs will be silently mismatched. Ensure `.yaml` is deployed alongside `.onnx` on the target.
 
-- [ ] **QNN-6.0** Wrapper preflight (MUST before final acceptance run)
-  - confirm current candidate artifacts near `{ONNX_FILE}`
-  - clean stale matched context files from prior runs
-  - confirm deployed context filename follows ONNX match rule (`{MODEL_NAME}.onnx.so.bin`)
-  - record selected artifact path in Issue Log
+- [x] **QNN-6.0** Wrapper preflight (MUST before final acceptance run)
+  - ✅ candidate artifacts near `mobilenet_v2.onnx`: `./libmobilenet_v2.so` (copied from `qairt_output/test_libs_mobilenet_v2_fp32_x86_64-linux-clang/x86_64-linux-clang/`), no stale `.so.bin`/`.onnx.so.bin` present
+  - ✅ deployed skill wrappers into workdir: `aipc` + `onnxwrapper.py` (= skill `onnxwrapper_x86.py`, x86 Linux flavor; contains NO `qai_appbuilder` — passes launcher check)
+  - ✅ selected artifact recorded in Issue Log #6 (`/home/.../libmobilenet_v2.so`)
 
-- [ ] **QNN-6.0b** Linux ARM runtime-libs pin (MUST for target acceptance)
-  ```bash
-  export QAI_QNN_LIBS_DIR={QAIRT_ROOT}/lib/aarch64-oe-linux-gcc11.2
-  export LD_LIBRARY_PATH=$QAI_QNN_LIBS_DIR:$LD_LIBRARY_PATH
-  export ADSP_LIBRARY_PATH={QAIRT_ROOT}/lib/hexagon-v{DSP_ARCH}/unsigned
-  ```
-  - Record `QAI_QNN_LIBS_DIR` and effective `LD_LIBRARY_PATH` in Issue Log
-  - If omitted, errors may include: `Failed to load skel`, `Transport layer setup failed: 14001`
+- [x] **QNN-6.0b** Linux ARM runtime-libs pin — **N/A on x86 Linux** (CPU backend). No HTP/ADSP skel; `libQnnCpu.so` resolved from the single `${QAIRT_SDK_ROOT}/lib/x86_64-linux-clang` dir.
 
-- [ ] **QNN-6.0d** Persist acceptance environment snapshot and attach to artifacts
-  - use platform-appropriate commands (Linux command shown in preflight section)
-  - output file: `{OUTPUT_DIR}/acceptance_env_snapshot.txt`
-  - reference this file in `REPORT.md` and `Issue Log`
+- [x] **QNN-6.0d** Persist acceptance environment snapshot and attach to artifacts
+  - ✅ `qairt_output/acceptance_env_snapshot.txt` (2026-09-06): QAIRT_SDK_ROOT, LD_LIBRARY_PATH captured; QAI_QNN_RUNTIME/ADSP/PRODUCT_SOC/DSP_ARCH = n/a on x86 CPU
 
-- [ ] **QNN-6.0e** Runtime libs consistency gate
-  - confirm runtime core libs resolve to the same intended toolchain/runtime family
-  - if mismatch: stop acceptance and fix runtime path selection first (e.g., `QAI_QNN_LIBS_DIR` / loader path alignment)
+- [x] **QNN-6.0e** Runtime libs consistency gate
+  - ✅ single runtime family: `libQnnCpu.so` + `libQnnSystem.so` both from `${QAIRT_SDK_ROOT}/lib/x86_64-linux-clang` (the only lib dir on LD_LIBRARY_PATH for QNN); x86 launcher uses absolute backend path
 
-- [ ] **QNN-6.1** Write pre-processing pipeline
-  - Input: `{INPUT_NAME}`, shape `{INPUT_SHAPE}`
-  - Operations: <!-- resize, normalize, channel reorder, etc. -->
-  - Output: `numpy.ndarray float32`
+- [x] **QNN-6.1** Write pre-processing pipeline
+  - Input: `input`, shape `[1, 3, 224, 224]`
+  - Operations: load `input.npy` as float32 as-is — **no resize/normalize** (input already matches export/training assumptions: seed-42 randn tensor produced in Phase 1)
+  - Output: `numpy.ndarray float32` (1, 3, 224, 224)
 
-- [ ] **QNN-6.2** Run inference via `aipc` wrapper
+- [x] **QNN-6.2** Run inference via `aipc` wrapper
+- ✅ Ran 2026-09-06: `source env_setup.sh && python aipc infer_mobilenet_v2.py`
+  - Skill wrappers deployed locally: `aipc` (launcher) + `onnxwrapper.py` (= skill `onnxwrapper_x86.py`)
+  - Model artifact: `./libmobilenet_v2.so` — x86 wrapper forces **CPU backend** (`libQnnCpu.so`); no context binary needed (`CONTEXT_BINARY_GEN = NO`, x86 Linux)
+  - Output: `[WARNING] !This is x86 emulation for development!` (expected on x86) → QNN output `(1, 1000)` float32 → saved `qnn_output.npy`
+  - Note: wrapper-resolved artifact verified as `./libmobilenet_v2.so` (not stale); `.yaml` deployed next to `.onnx` for output-order restore (single output here).
   ```bash
   # Ensure QAIRT_SDK_ROOT is set (source {QAIRT_ENV_SETUP} first)
   
@@ -985,29 +970,18 @@ real_inference_output.txt or equivalent log must include:
   > Linux `.so` (non-context) is allowed only if QNN-5.7 fallback gate is satisfied and logged.
   > **Deploy `.yaml` alongside `.onnx` on target** — wrapper output reorder depends on it. Missing `.yaml` causes silent output mismatch.
 
-- [ ] **QNN-6.3** Write post-processing pipeline
-  - Outputs: `{OUTPUT_NAMES}`
-  - Operations: <!-- softmax / NMS / decode boxes / etc. -->
+- [x] **QNN-6.3** Write post-processing pipeline
+  - Outputs: `output` `(1, 1000)` classification logits
+  - Operations: `argmax` Top-1 + Top-5 index comparison vs golden; cosine similarity computation; JSON result → `real_inference_output.txt`
 
-- [ ] **QNN-6.4** Validate against PyTorch / ONNX CPU baseline
-  - input tensor name/shape match model
-  - preprocessing matches training/export assumptions
-  - output tensor mapping is correct
-  - **Raw tensor check**: cosine similarity vs. ONNX CPU baseline ≥ 0.99 (FP) / ≥ 0.95 (INT8)
-  - **Decoded output check** (mandatory for all model types — choose the applicable row):
-
-    | Model type | Baseline to run | Decoded output to compare |
-    |---|---|---|
-    | Classification | ONNX CPU `session.run()` | Top-1 / Top-5 class label matches |
-    | Detection | ONNX CPU `session.run()` | Box coords + class labels within IoU ≥ 0.9 of baseline |
-    | Segmentation | ONNX CPU `session.run()` | Mask pixel agreement ≥ 95% vs baseline |
-    | Audio / ASR | ONNX CPU `session.run()` | Transcript / token sequence matches baseline |
-    | Embedding | ONNX CPU `session.run()` | Cosine similarity of embedding vector ≥ 0.999 |
-    | LLM / decoder | ONNX CPU greedy decode | Generated token IDs match baseline for ≥ first 10 new tokens; decoded text is semantically coherent |
-    | Custom | ONNX CPU `session.run()` | Task-specific metric matches baseline within acceptable tolerance |
-
-  - Record: input source, baseline output, QNN output, decoded comparison result, pass/fail
-  - collect latency / FPS on target runtime
+- [x] **QNN-6.4** Validate against PyTorch / ONNX CPU baseline
+  - input tensor name/shape: `input` `[1,3,224,224]` ✅
+  - preprocessing matches export assumptions ✅ (same `input.npy` as ONNX CPU baseline/Phase 2)
+  - output tensor mapping: `output` `(1,1000)` ✅ (single output)
+  - **Raw tensor check**: cosine similarity vs PyTorch golden = **1.00000000** (≥ 0.99 FP floor ✅, ≥ 0.95 acceptance ✅)
+  - **Decoded output check (classification)**: Top-1 index QNN=92 == Golden=92 ✅; Top-5 sets identical ✅
+  - Recorded: input source=`input.npy`, baseline=`golden_output.npy`, QNN output=`qnn_output.npy`, result=`real_inference_output.txt`, elapsed (incl. init)=84.89 ms on x86 CPU sim
+  - Snapshot: `qairt_output/acceptance_env_snapshot.txt`
 
 **Exit Criteria**: `infer_{MODEL_NAME}.py` runs end-to-end, decoded output matches PyTorch/ONNX CPU baseline per the table above, and results are recorded in `real_inference_output.txt`.
 
@@ -1215,31 +1189,34 @@ DLC_FILE      = <!-- {MODEL_NAME}.dlc  /  {MODEL_NAME}_quantized.dlc (QAIRT)  / 
 
 ## Tasks
 
-- [ ] **6.1** Accuracy comparison: ONNX vs. {FLOW} output
-  - Method: cosine similarity on `{OUTPUT_NAMES}` tensors
+- [x] **6.1** Accuracy comparison: ONNX vs. {FLOW} output
+  - Method: cosine similarity on `output` tensors; also SNR / MAE / max diff (see `metrics_phase7.json`)
   - FP16/FP32/BF16 threshold: ≥ 0.99
-  - BF16 threshold: user-confirmed tolerance after end-to-end validation
-  - Low-Bit Quantization (INT4/INT8/A16W8) threshold: ≥ 0.95
-  - Result: <!-- PASS / FAIL, score: value -->
+  - Result: **PASS** — QNN vs golden cosine = **1.00000000** (SNR 115.25 dB, MAE 1.00e-06); QNN vs ONNX CPU cosine = 1.00000000 (SNR 118.14 dB)
 
-- [ ] **6.2** Task-specific accuracy (if applicable)
-  - Metric: <!-- mAP / Top-1 Acc / WER / BLEU / etc. -->
-  - Baseline ({SRC_FRAMEWORK}): <!-- value -->
-  - {FLOW} {PRECISION}: <!-- value -->
-  - Acceptable drop: ≤ 1%
+- [x] **6.2** Task-specific accuracy (if applicable)
+  - Metric: Top-1 / Top-5 class index match vs PyTorch golden
+  - Baseline (PyTorch): argmax = 92
+  - QNN FP32: argmax = 92 → **exact match, 0.0% drop** (acceptable ≤ 1%)
+  - Top-5 sets identical ✅
 
-- [ ] **6.3** Latency benchmark on `{TARGET_DEVICE}`
-  - Runtime: <!-- HTP / DSP / CPU / GPU -->
+- [x] **6.3** Latency benchmark on `{TARGET_DEVICE}` (x86 Linux)
+  - Runtime: QNN CPU (libQnnCpu.so, x86 simulation via aipc wrapper)
   - Batch size: 1
-  - Avg latency: <!-- ms -->
-  - Throughput: <!-- FPS -->
+  - Avg latency: **62.37 ms** (p50 42.94 ms, p95 216.87 ms; 3 warmup + 20 timed)
+  - Throughput: **16.03 FPS** (informational — subprocess-spawn dominated sim)
+  - Evidence: `qairt_output/latency_benchmark.json`
 
-- [ ] **6.4** Regression test with known-good inputs
-  - Test cases: <!-- N --> / Pass: <!-- N --> / Fail: <!-- 0 -->
+- [x] **6.4** Regression test with known-good inputs
+  - Test cases: `infer_mobilenet_v2.py` on known-good `input.npy` → 3 runs / 3 PASS; bench 23 runs / 23 PASS; ORT baseline 1/1 PASS
 
-- [ ] **6.5** Document results in `REPORT.md`
-- [ ] **6.6** Record completion fields in Config (`END_TIME`, `WORK_TIME`) and final pass/fail status
-- [ ] **6.7** Verify runtime validation execution on configured target (local or remote)
+- [x] **6.5** Document results in `REPORT.md` ✅ (created 2026-09-06 22:05, `ls REPORT.md`)
+
+- [x] **6.6** Record completion fields in Config (`END_TIME`, `WORK_TIME`) and final pass/fail status
+  - `END_TIME = 2026-09-06 22:05`, `WORK_TIME = 28h 36m`, final status = **PASS**
+
+- [x] **6.7** Verify runtime validation execution on configured target (local or remote)
+  - `RETMOE_DEVICE_INFO` empty → local x86 Linux; acceptance re-run 3× ✅; env snapshot `qairt_output/acceptance_env_snapshot.txt`
 
 **Exit Criteria**: All accuracy thresholds met. Latency meets project requirements.
 
@@ -1254,7 +1231,12 @@ DLC_FILE      = <!-- {MODEL_NAME}.dlc  /  {MODEL_NAME}_quantized.dlc (QAIRT)  / 
 
 > Run after Phase 7 validation passes. Profiling requires a working inference pipeline.  
 > Goal: collect per-layer execution data, identify bottlenecks, and produce an actionable report.
-> 
+>
+> **Status: ✅ Done (skipped with recorded reason, 2026-09-06).** Bring-up target is **x86 Linux CPU
+> simulation** with no HTP/context binary and no SoC device — Optrace/QHAS profiling (7.2–7.5) targets
+> HTP context bins and is not applicable. Phase 7 latency benchmark (`qairt_output/latency_benchmark.json`)
+> covers the bring-up performance need (mean 62.4 ms / 16.0 FPS). No `qairt_profile_*` dir required.
+>
 > ⚠️ **Directory Isolation Rule**: For all profiling work, you must copy/save all related artifacts—including the compiled context binary, the converted QNN/SNPE model bin, network structure JSONs, dynamic libraries, and the generated profile output trace files—into a separate directory dedicated to the specific layout preservation mode under evaluation. The directory name must use the prefix `qairt_profile_{layout}` (for example: `qairt_profile_datatype`, `qairt_profile_layout`, or `qairt_profile_none`).
 
 ## Tasks
@@ -1431,49 +1413,46 @@ DLC_FILE      = <!-- {MODEL_NAME}.dlc  /  {MODEL_NAME}_quantized.dlc (QAIRT)  / 
 
 ### Tasks
 
-- [ ] **R.1** Collect validation artifacts
-  - `accuracy_check/metrics.json`
-  - `accuracy_check/baseline_outputs/`
-  - `accuracy_check/target_outputs/`
-  - `real_inference_output.txt`
-  - task-specific evaluation results, if available
-  - accepted deployed artifact path and wrapper artifact-preflight log
+- [x] **R.1** Collect validation artifacts
+  - `metrics_phase7.json` (raw tensor metrics: cosine/SNR/MAE/max diff)
+  - `onnx_cpu_output.npy` (baseline output), `qnn_output.npy` (target output)
+  - `real_inference_output.txt` ✅
+  - task-specific: Top-1/Top-5 index match (0% drop)
+  - accepted artifact: `libmobilenet_v2.so` (qairt_output/test_libs_mobilenet_v2_fp32_x86_64-linux-clang/x86_64-linux-clang/) + wrapper preflight log (`python aipc infer_mobilenet_v2.py`)
 
-- [ ] **R.2** Collect profiling artifacts
-  - QNN: `htp_stats.txt`, `qnn-profile-viewer` outputs, QHAS/chrometrace files if generated
-  - SNPE: `SNPEDiag_*.log`, `snpe-diagview_stdout.txt`
-  - latency/FPS measurements from non-profiling acceptance runs
+- [x] **R.2** Collect profiling artifacts
+  - QNN: n/a — CPU-sim bring-up, no HTP optrace/context binary (Phase 8 skipped, reason recorded)
+  - SNPE: n/a (Flow A — QNN)
+  - latency/FPS from non-profiling acceptance runs: `qairt_output/latency_benchmark.json` (mean 62.37 ms, 16.03 FPS)
 
-- [ ] **R.3** Write `ACCURACY_REPORT.md`
-  - model / flow / precision / target device summary
-  - selected deployed artifact (`.so`, `.dll`, `.dlc`, `.so.bin`, or `.dll.bin`)
-  - raw tensor metrics (`cosine`, `SNR`, `MAE`, max diff)
-  - decoded/task-specific comparison
-  - profiling bottlenecks and accuracy-performance tradeoffs
-  - pass/fail conclusion and known limitations
+- [x] **R.3** Write `ACCURACY_REPORT.md` ✅ (2026-09-06)
+  - model / flow / precision / target: MobileNetV2, QNN, FP32, x86 Linux CPU
+  - deployed artifact: `libmobilenet_v2.so` (ELF x86-64)
+  - raw tensor metrics: cosine = 1.00000000, SNR = 115.25 dB, MAE = 1.00e-06, max diff = 5.84e-06
+  - decoded/task-specific: Top-1 92==92, Top-5 identical → 0% drop
+  - profiling/bottlenecks: n/a (CPU sim; latency recorded)
+  - conclusion: PASS; limitations documented
 
-- [ ] **R.4** Run / document QAIRT Accuracy Debugger backup as needed
-  - default acceptance remains AIPC wrapper output from Phase 6/7
-  - if debugger is used, record ladder status: `framework_runner` -> `inference_engine` -> `verification` -> `tensor_visualizer` -> `snooping`
-  - collect debugger CSV/HTML/plot paths, worst tensor/op, and rows below threshold
-  - record target debugger limitations separately from final acceptance, especially when debugger reconverts/re-prepares a model that already passed wrapper acceptance
+- [x] **R.4** Run / document QAIRT Accuracy Debugger backup as needed
+  - default acceptance remains AIPC wrapper output from Phase 6/7 (`real_inference_output.txt`, `qnn_output.npy`)
+  - debugger **not used** — no ladder status; documented in `ACCURACY_REPORT.md` §8
 
-- [ ] **R.5** Link report from `REPORT.md`
-  - Add a short `## Accuracy Report` section with the path to `ACCURACY_REPORT.md`.
-  - Record whether any debugger-only backup path was used (`verification`, `snooping`, or `inference_engine`).
+- [x] **R.5** Link report from `REPORT.md`
+  - ✅ Added `## Accuracy Report` section in `REPORT.md` linking `ACCURACY_REPORT.md`
+  - Debugger-only backup path used: **none** (`verification`/`snooping`/`inference_engine` = not used)
 
 ### Accuracy Report Summary
 
 | Item | Value |
 |---|---|
 | Report path | `ACCURACY_REPORT.md` |
-| Validation status | <!-- PASS / FAIL --> |
-| Main raw tensor metric | <!-- e.g. cosine=0.9992, SNR=34.1 dB --> |
-| Task metric | <!-- e.g. Top-1 match / mAP drop / WER --> |
-| Profiling summary | <!-- top bottleneck + latency --> |
-| Debugger backup used | <!-- none / framework_runner / inference_engine / verification / tensor_visualizer / snooping --> |
-| Debugger artifacts | <!-- e.g. ACCURACY_DEBUGGER_WORKFLOW.md, verification.csv, tensor_visualizer plots, snooping CSV --> |
-| Direct model-library fallback | <!-- N/A or .so/.dll diagnostic result, including arch and exit status --> |
+| Validation status | **PASS** |
+| Main raw tensor metric | cosine = 1.00000000, SNR = 115.25 dB (QNN vs golden) |
+| Task metric | Top-1 match (92==92), Top-5 identical → 0% drop |
+| Profiling summary | n/a (CPU-sim) — latency mean 62.37 ms / 16.03 FPS |
+| Debugger backup used | none |
+| Debugger artifacts | none |
+| Direct model-library fallback | N/A (`.so` used directly on x86 Linux CPU by design, `CONTEXT_BINARY_GEN = NO`) |
 
 **Exit Criteria**: `ACCURACY_REPORT.md` exists, is linked from `REPORT.md`, and summarizes validation/profiling evidence without triggering reconversion unless explicitly justified by missing artifacts.
 
@@ -1656,15 +1635,21 @@ New ops discovered: {list or "none"}
 
 | # | Phase | Flow | Issue | Status | Resolution |
 |---|---|---|---|---|---|
-| 1 | | {FLOW} | | Open | |
+| 1 | 1 | QNN | Model-side NPU adaptation review for MobileNetV2 | Resolved | Generic CNN → `PYTORCH_ADAPTATION_NEEDED = No`; baseline `input.npy` / `golden_output.npy` generated and validated (shape/dtype/finite/nonzero) |
+| 2 | 2 | QNN | ONNX export + validation (opset 13, fixed I/O shapes) | Resolved | `mobilenet_v2.onnx` (13.9 MB) exported; onnx.checker ✅; onnxsim ✅; ORT vs PyTorch cosine = 1.00000012 (≥ 0.95 PASS). Artifacts: export_onnx.py, validate_onnx.py |
+| 3 | 3 | QNN | qnn-onnx-converter crashes: `libpython3.10.so.1.0 cannot open shared object file` + `numpy.dtype size changed` (pandas 2.0.1 ABI vs numpy 2.2.6) | Resolved | B2 user-approved `pip install numpy==1.26.4` (2026-09-06 21:31) + `LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH`. QAIRT check-python-dependency aligned; recorded `python lib install = yes` |
+| 4 | 3 | QNN | Dry-run flagged 35× `Clip: unsupported version` (ReLU6, opset 13 Clip-11 inputs-min/max form) | Resolved | Benign warning — verified via actual conversion: `WARNING_OP_VERSION_NOT_SUPPORTED` only; ONNX→QNN IR conversion completed (`_dryrun_test/mobilenet_v2.cpp/.bin/_net.json`). 100% op compatibility confirmed; no patch needed |
+| 5 | QNN-4A | QNN | FP32 conversion via skill wrapper `aipc_convert_fp.py` (opset-13 model) | Resolved | `Converted: 1, Failed: 0`. `libmobilenet_v2.so` = qairt_output/test_libs_mobilenet_v2_fp32_x86_64-linux-clang/x86_64-linux-clang/libmobilenet_v2.so (14,322,248 B, ELF x86-64 ✅). Intermediates retained in repo root via `--no-cleanup` |
+| 6 | QNN-5/QNN-6 | QNN | Phase 5 skipped by config (`CONTEXT_BINARY_GEN = NO`, x86 Linux, no HTP/SoC) → `.so` direct inference path; Phase 6 inference acceptance | Resolved | QNN-5 ✅ Done (skipped, logged). QNN-6: `python aipc infer_mobilenet_v2.py` on CPU backend (libQnnCpu.so) → cosine vs golden = **1.00000000** (≥0.95 PASS, ≥0.99 FP floor PASS), Top-1/Top-5 match idx 92. Artifacts: qnn_output.npy, real_inference_output.txt, qairt_output/acceptance_env_snapshot.txt. Selected artifact: /home/spelunky-forever/workplace/AIPC-for-Novatek/libmobilenet_v2.so |
+| 7 | 7/8/R | QNN | Phase 7 validation + Phase 8 profiling decision + Phase R accuracy report | Resolved | Phase 7: cosine=1.00000000 (SNR 115.25 dB), Top-1 drop 0%, latency mean 62.37 ms/16.03 FPS, regression 3/3 → PASS. Phase 8 skipped (CPU-sim, no HTP), latency benchmark recorded instead. Phase R: ACCURACY_REPORT.md written+linked, debugger not used. END_TIME=2026-09-06 22:05, WORK_TIME=28h 36m, status PASS |
 
 ### Phase Handoff Checklist (Issue Log Automation)
 
-- [ ] Latest phase has at least one updated row in **General Issues**
-- [ ] All failing commands in this phase are captured with short error signature
-- [ ] All produced artifacts for this phase are recorded (path + result)
-- [ ] If patching occurred: `PATCH_*` fields and Operator Iteration History are updated
-- [ ] Status reflects reality (`Open` only if unresolved; otherwise `Resolved`)
+- [x] Latest phase has at least one updated row in **General Issues** (rows #1–#7 covering Phase 1, 2, 3, QNN-4A, QNN-5, QNN-6, Phase 7/8/R)
+- [x] All failing commands in this phase are captured with short error signature (no failures in Phase 1/2)
+- [x] All produced artifacts for this phase are recorded (path + result)
+- [x] If patching occurred: `PATCH_*` fields and Operator Iteration History are updated (N/A — no patches, `PATCH_NEEDED = No` recorded)
+- [x] Status reflects reality (`Open` only if unresolved; otherwise `Resolved`)
 
 ---
 
@@ -1672,24 +1657,24 @@ New ops discovered: {list or "none"}
 
 | Phase | Description | Flow | Status |
 |---|---|---|---|
-| 0 | Environment & Prerequisites (toolchain, venv, env vars) | Common | ⬜ Not Started |
-| 1 | NPU Model Adaptation (wrappers, fixed-shape, operator changes) | Common | ⬜ Not Started |
-| 2 | Model Export to ONNX | Common | ⬜ Not Started |
-| 3 | Model Inspection | Common | ⬜ Not Started |
-| QNN-4A | FP16/FP32/BF16 Conversion | QNN | ⬜ Not Started |
+| 0 | Environment & Prerequisites (toolchain, venv, env vars) | Common | 🔄 In Progress (env verified during Phase 1/2 run) |
+| 1 | NPU Model Adaptation (wrappers, fixed-shape, operator changes) | Common | ✅ Done |
+| 2 | Model Export to ONNX | Common | ✅ Done |
+| 3 | Model Inspection | Common | ✅ Done |
+| QNN-4A | FP16/FP32/BF16 Conversion | QNN | ✅ Done |
 | QNN-4B | Model Quantization (INT4/INT8/A16W8) — QAIRT | QNN | ⬜ Not Started |
 | QNN-4C | Model Quantization (INT4/INT8/A16W8) — AIMET, same precision + advanced PTQ (Linux only) | QNN | ⬜ Not Started |
-| QNN-5 | Context Binary Generation | QNN | ⬜ Not Started |
-| QNN-6 | Inference (aipc wrapper) | QNN | ⬜ Not Started |
+| QNN-5 | Context Binary Generation | QNN | ✅ Done (skipped by config — `CONTEXT_BINARY_GEN = NO`; x86 Linux `.so` direct path) |
+| QNN-6 | Inference (aipc wrapper) | QNN | ✅ Done |
 | SNPE-4 | DLC Conversion (FP16/FP32/BF16) | SNPE | ⬜ Not Started |
 | SNPE-5A | DLC Quantization (INT4/INT8/A16W8) — QAIRT | SNPE | ⬜ Not Started |
 | SNPE-5B | DLC Quantization (INT4/INT8/A16W8) — AIMET, same precision + advanced PTQ (Linux only) | SNPE | ⬜ Not Started |
 | SNPE-6 | Inference (aipc wrapper) | SNPE | ⬜ Not Started |
-| 7 | Validation & Testing | Common | ⬜ Not Started |
-| 8 | Profiling & Bottleneck Report | Common | ⬜ Not Started |
-| QNN-9 | Layout Optimization (remove `--preserve_io`, optional end-of-plan) | QNN | ⬜ Not Started |
-| R | Accuracy Report (optional, disabled by default) | Common | ⬜ Not Started |
-| E | Skill Evolution (evolve, post-project, opt-in) | Common | ⬜ Not Started |
+| 7 | Validation & Testing | Common | ✅ Done |
+| 8 | Profiling & Bottleneck Report | Common | ✅ Done (skipped — CPU-sim bring-up; latency benchmark recorded) |
+| QNN-9 | Layout Optimization (remove `--preserve_io`, optional end-of-plan) | QNN | ⏭️ Skipped (`OPTIMIZE_LAYOUT = NO`) |
+| R | Accuracy Report (optional, disabled by default) | Common | ✅ Done (`ACCURACY_REPORT.md`) |
+| E | Skill Evolution (evolve, post-project, opt-in) | Common | ⏭️ Skipped (`EVOLVE = NO`) |
 
 > Status legend: ⬜ Not Started · 🔄 In Progress · ✅ Done · ❌ Blocked
 

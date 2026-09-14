@@ -91,12 +91,12 @@ ls -lh qairt_output/
 
 - 檢查日誌中無任何 Segmentation fault 或 Failed to generate model library 錯誤。
 
-## Stage 5: CPU Backend Inference & Accuracy Acceptance (Phase 5)
+## Stage 5: CPU Backend Inference & Accuracy Acceptance (Phase 6)
 執行目標：依據防護守則（Guardrails），必須使用 scripts/aipc wrapper 與 Skill 修補過的 scripts/onnxwrapper.py 加載編譯產物，在 CPU 後端運行推理，計算 QNN 推理輸出與 PyTorch Golden 輸出的餘弦相似度是否符合 $\ge 0.95$ 標準。
 
 Prompt
 ```
-Follow aipc-toolkit skill strictly. Execute Phase 5 (Inference Validation & Acceptance):
+Follow aipc-toolkit skill strictly. Because config setting says CONTEXT_BINARY_GEN = NO, so directly execute Phase 6 (Inference Validation & Acceptance):
 1. Preflight check: Ensure the inference wrapper uses `scripts/aipc` and the patched `scripts/onnxwrapper.py` provided by the skill. Never fallback to the bundled SDK copy.
 2. Execute inference using the CPU backend on x86 Linux with `input.npy`.
 3. Load the resulting QNN inference output and compute the Cosine Similarity against `golden_output.npy`.
@@ -108,3 +108,9 @@ Follow aipc-toolkit skill strictly. Execute Phase 5 (Inference Validation & Acce
 - 數值門檻：終端最後輸出的比對指標：$$\text{Cosine Similarity} \ge 0.95$$在 FP32 精度下，CPU 後端的比對結果通常落在 $0.999 \sim 1.000$ 之間。
 
 - 計畫看板確認：開啟 aipc_plan.md，確認 Phase 1 至 Phase 5 的核取方塊均已被 Agent 標記為完成 [x]，且附帶了數值相似度與耗時記錄。
+
+## Stage 6: Wrap up
+Prompt
+```
+Follow aipc-toolkit skill strictly. Please proceed with Phase 7 to generate REPORT.md, summarize the task completion metrics, and close the project bring-up.
+```

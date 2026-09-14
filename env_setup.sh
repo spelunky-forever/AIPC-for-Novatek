@@ -10,6 +10,12 @@ export PYTHONPATH="${PYTHONPATH:-}"
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
 source "${QAIRT_SDK_ROOT}/bin/envsetup.sh"
 
+# Workaround (recorded in aipc_plan.md Issue Log #3): QAIRT converter C-extensions
+# (libPyIrGraph) need libpython3.10.so.1.0 from the conda env and pandas must see
+# numpy 1.26.4 (SDK check-python-dependency matrix). Prepend $CONDA_PREFIX/lib so
+# the converted tools find the conda runtime libs.
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+
 # 依架構選擇工具鏈路徑
 if [ "$(uname -m)" = "x86_64" ]; then
   QAIRT_DEVICE_BIN="x86_64-linux-clang"
