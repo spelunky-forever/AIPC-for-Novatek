@@ -47,12 +47,13 @@ class Runtime:
 
 class SessionOptions:
     def __init__(self):
-        # x86 wrapper policy: always force CPU runtime for stable local execution.
-        self.qnn_runtime = "CPU"
+        # x86 wrapper: default CPU; allow HTP backend via QAI_QNN_RUNTIME env (HTP simulator).
+        self.qnn_runtime = os.environ.get("QAI_QNN_RUNTIME", "CPU").strip().upper() or "CPU"
 
     def set_qnn_runtime(self, runtime: Union[str, Runtime]):
-        # Ignore caller-provided runtime (e.g. HTP) and keep CPU.
-        self.qnn_runtime = "CPU"
+        # Honor explicit runtime (used for HTP simulator). Default to CPU.
+        env_runtime = os.environ.get("QAI_QNN_RUNTIME", "").strip().upper()
+        self.qnn_runtime = env_runtime or (str(runtime).upper() if runtime else "CPU")
 
 
 class InferenceSession:
@@ -76,6 +77,19 @@ class InferenceSession:
         self.host_env = self._detect_host_env()
         self.input_names, self.output_names, self.input_shapes, self.output_shapes = self._load_io_metadata()
         self.backend_model = self._resolve_backend_model()
+
+        # ── RUNTIME ARTIFACT NOTICE (showcase which artifact/backend will be used) ──────────
+        _kind = "CONTEXT BINARY (.bin)" if self.backend_model.endswith(".bin") else "MODEL LIBRARY (.so)"
+        _flag = "--retrieve_context" if self.backend_model.endswith(".bin") else "--model"
+        _backend = self._qnn_backend_lib(force_htp=self.backend_model.endswith(".bin"))
+        _rt = (self.sess_options.qnn_runtime or "CPU").upper()
+        print(f"\n[aipc] ★ RUNTIME ARTIFACT NOTICE ★")
+        print(f"[aipc]   runtime           : {_rt}  (env QAI_QNN_RUNTIME='{os.environ.get('QAI_QNN_RUNTIME', '')}')")
+        print(f"[aipc]   selected artifact : {self.backend_model}")
+        print(f"[aipc]   artifact kind     : {_kind}")
+        print(f"[aipc]   backend lib       : {_backend}")
+        print(f"[aipc]   qnn-net-run flag  : {_flag}")
+        print(f"[aipc]   using HTP context? {'YES — CONTEXT BINARY (NOT .so)' if self.backend_model.endswith('.bin') else 'NO — using model library .so'}\n")
 
     def _detect_host_env(self) -> str:
         candidates = [
@@ -130,16 +144,27 @@ class InferenceSession:
     def _resolve_backend_model(self) -> str:
         candidates = []
         prefer_qnn = os.environ.get("QAI_USE_QNN_NETRUN", "0").strip().lower() in {"1", "true", "yes", "on"}
-        qnn_candidates = [
+        runtime = (self.sess_options.qnn_runtime or "CPU").upper()
+
+        model_libs = [
             os.path.join(os.path.dirname(self.model_path), "lib" + os.path.basename(self.model_stem) + ".so"),
-            os.path.join(os.path.dirname(self.model_path), "lib" + os.path.basename(self.model_stem) + ".so.bin"),
             self.model_stem + ".so",
+        ]
+        context_bins = [
+            self.model_stem + ".onnx.so.bin",
+            os.path.join(os.path.dirname(self.model_path), "lib" + os.path.basename(self.model_stem) + ".so.bin"),
             self.model_stem + ".so.bin",
             self.model_stem + ".bin",
         ]
+        # HTP contexts must be retrieved with libQnnHtp.so; the CPU model library uses libQnnCpu.so.
+        # Pick an artifact family consistent with the selected runtime so the backend always matches.
+        if runtime == "HTP":
+            qnn_candidates = context_bins + model_libs
+        else:
+            qnn_candidates = model_libs + context_bins
         dlc_candidates = []
         # Prefer explicit runtime artifacts first.
-        if self.sess_options.qnn_runtime.upper() == "CPU":
+        if runtime == "CPU":
             dlc_candidates.extend([
                 self.model_stem + "_fp32_cpu.dlc",
                 os.path.join(os.path.dirname(self.model_path), os.path.basename(self.model_stem) + "_fp32_cpu.dlc"),
@@ -172,9 +197,10 @@ class InferenceSession:
             raise RuntimeError(f"{exe} not found at {path}")
         return path
 
-    def _qnn_backend_lib(self) -> str:
+    def _qnn_backend_lib(self, force_htp: bool = False) -> str:
         lib_dir = os.path.join(self.sdk_root, "lib", self.host_env)
-        runtime = self.sess_options.qnn_runtime.upper()
+        # A context binary (.bin) is always an HTP context → must use libQnnHtp.so.
+        runtime = "HTP" if force_htp else self.sess_options.qnn_runtime.upper()
         if os.name == "nt":
             cpu_name = "QnnCpu.dll"
             htp_name = "QnnHtp.dll"
@@ -252,12 +278,16 @@ class InferenceSession:
     def _run_qnn(self, input_list: str, workdir: str):
         is_context = self.backend_model.endswith(".bin")
         model_flag = "--retrieve_context" if is_context else "--model"
+        if is_context and not os.environ.get("ADSP_LIBRARY_PATH"):
+            # x86 HTP simulator default (DSP_ARCH=v73); allows context inference out-of-the-box.
+            os.environ["ADSP_LIBRARY_PATH"] = os.path.join(self.sdk_root, "lib", "hexagon-v73", "unsigned")
+            print(f"[aipc] ADSP_LIBRARY_PATH defaulted to {os.environ['ADSP_LIBRARY_PATH']} (HTP simulator)")
         cmd = [
             self._qnn_net_run_path(),
             model_flag,
             self.backend_model,
             "--backend",
-            self._qnn_backend_lib(),
+            self._qnn_backend_lib(force_htp=is_context),
             "--input_list",
             input_list,
             "--output_dir",

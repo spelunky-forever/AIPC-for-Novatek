@@ -1,0 +1,17 @@
+---
+timestamp: 10053936698
+command: qnn-net-run --retrieve_context /home/spelunky-forever/workplace/AIPC-for-Novatek/qairt_output/libmobilenet_v2.so.bin --backend /home/spelunky-forever/workplace/AIPC-for-Novatek/toolchains/qairt/2.45.0.260326/lib/x86_64-linux-clang/libQnnHtp.so --input_list /home/spelunky-forever/workplace/AIPC-for-Novatek/_htp_diag/input_list.txt --output_dir /home/spelunky-forever/workplace/AIPC-for-Novatek/_htp_diag/out
+execution_mode: synchronous
+inferences_completed: 1
+graphs:
+  - graph_name: mobilenet_v2
+    input_tensors:
+    - tensor_name: input
+      id: 1
+      datatype: QNN_DATATYPE_FLOAT_32
+      dimensions: [1,3,224,224]
+    output_tensors:
+    - tensor_name: output
+      id: 369
+      datatype: QNN_DATATYPE_FLOAT_32
+      dimensions: [1,1000]

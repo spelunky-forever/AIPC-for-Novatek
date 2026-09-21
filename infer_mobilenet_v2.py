@@ -12,6 +12,7 @@ Usage:
     python aipc infer_mobilenet_v2.py
 """
 import json
+import os
 import time
 
 import numpy as np
@@ -73,7 +74,9 @@ print(f"[acceptance] cosine >= 0.99 (AGENTS FP floor): {higher_bar}")
 
 results = {
     "model": "mobilenet_v2",
-    "runtime": "QNN-CPU (libQnnCpu.so via aipc/onnxwrapper_x86)",
+    "runtime": os.environ.get("QAI_QNN_RUNTIME", "CPU").upper()
+    + " via aipc/onnxwrapper"
+    + (" (libQnnHtp.so, context .so.bin)" if os.environ.get("QAI_QNN_RUNTIME", "CPU").upper() == "HTP" else " (libQnnCpu.so)"),
     "input": {"name": inp.name, "shape": list(inp.shape)},
     "output": {"name": out.name, "shape": list(out.shape)},
     "qnn_output_file": QNN_OUT_NPY,

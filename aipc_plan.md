@@ -14,7 +14,7 @@ Before reporting the whole project as complete:
 
 - [x] Main configured flow is complete and accepted on the required target (`RETMOE_DEVICE_INFO` empty → local x86 Linux accepted; QNN-6 PASS 3/3).
 - [x] `REPORT.md` exists and links the final validation evidence.
-- [x] Config completion fields are filled: `END_TIME = 2026-09-06 22:05`, `WORK_TIME = 28h 36m`, final status = PASS.
+- [x] Config completion fields are filled: `END_TIME = 2026-09-14 17:24`, `WORK_TIME = 8d 23h 55m`, final status = PASS.
 - [x] If `ACCURACY_REPORT = YES`, Phase R is complete and linked from `REPORT.md` (`ACCURACY_REPORT.md` written and linked).
 - [~] If `EVOLVE = YES`, Phase E is complete... — **N/A** (`EVOLVE = NO`, Phase E disabled).
 - [~] If `EVOLVE = YES` but no skill changes are applied... — **N/A** (`EVOLVE = NO`).
@@ -45,7 +45,9 @@ TARGET_DEVICE = x86 Linux
 PRECISION     = FP32
 QUANT_TOOL    = QAIRT
 HOST_DEVICE     = X86 LINUX
-CONTEXT_BINARY_GEN = NO
+CONTEXT_BINARY_GEN = YES
+SOC_ID        = 0 <!-- emulation default: host x86 HTP simulator (no physical target device) -->
+DSP_ARCH      = v73 <!-- HTP v73 arch for emulation; SDK ships lib/hexagon-v73/unsigned + QEMU driver -->
 
 RETMOE_DEVICE_INFO = 
 
@@ -66,8 +68,8 @@ CALIB_LIST       = calibration_list.txt
 OUTPUT_DIR    = qairt_output
 OWNER         = aipc
 START_TIME    = 2026-09-05 17:29
-END_TIME      = 2026-09-06 22:05
-WORK_TIME     = 28h 36m 
+END_TIME      = 2026-09-14 17:24
+WORK_TIME     = 8d 23h 55m (incl. HTP context-binary + simulator validation follow-up) 
 python venv   = project
 python lib install = yes <!-- 2026-09-06 21:33: pip install numpy==1.26.4 in conda env aipc (B2, user-approved) to align with QAIRT 2.45 dependency matrix (check-python-dependency: numpy 1.26.4). Fixes pandas 2.0.1 ABI crash in qnn-onnx-converter. -->
 
@@ -738,7 +740,7 @@ PY
 **Agent**: Context Binary Agent  
 **Reference**: `skills/aipc-toolkit/references/host_context_binary_gen.md`
 
-> **Status: ✅ Done (skipped by config, 2026-09-06).** `CONTEXT_BINARY_GEN = NO` and the acceptance target is **x86 Linux** (same machine, CPU backend — no HTP SoC deployment, no remote device). Per AGENTS.md, context binary is **optional on Linux**; the `.so` model library is used directly for inference. See Issue Log #6.
+> **Status: ✅ Done (2026-09-14).** `CONTEXT_BINARY_GEN = YES` — HTP context binary generated on x86 host (`SOC_ID = 0`, `DSP_ARCH = v73`, `vtcm_mb = 0`) → `qairt_output/libmobilenet_v2.so.bin` (14,217,216 B) and validated on the **x86 QNN HTP simulator**: deployed as `./mobilenet_v2.onnx.so.bin`, executed via `python aipc` (retrieves context with `libQnnHtp.so`, `ADSP_LIBRARY_PATH=lib/hexagon-v73/unsigned`) → cosine = 1.00000000 vs golden. See Issue Log #8.
 
 > Context binary generation runs on the **host** (x86 Linux or x86 Windows), not on the target device.
 > The host uses `qnn-context-binary-generator` with `soc_id`/`dsp_arch` config to compile a binary for the target SoC.
@@ -753,9 +755,11 @@ PY
 
 ### Tasks
 
-- [ ] **QNN-5.1** Confirm `{SOC_ID}` and `{DSP_ARCH}` from target device (see `host_context_binary_gen.md` Step 1; on Windows on Snapdragon, run the `aipc_qairt_devinfo.ps1` script from the skill scripts directory to automatically detect them)
+- [x] **QNN-5.1** Confirm `{SOC_ID}` and `{DSP_ARCH}` from target device
+  - **Emulation mode**: no physical target — used QAIRT HTP **simulator** defaults: `SOC_ID = 0`, `DSP_ARCH = v73` (matches shipped `lib/hexagon-v73/unsigned` + QEMU driver). Recorded in Config.
 
-- [ ] **QNN-5.2** Create SoC config file (`.conf`) on the host:
+- [x] **QNN-5.2** Create SoC config file (`.conf`) on the host:
+  - ✅ `/tmp/soc0_v73.conf` (2026-09-14): `{"graphs":[{"graph_names":["mobilenet_v2"],"vtcm_mb":0,"O":3}],"devices":[{"soc_id":0,"dsp_arch":"v73","cores":[{"perf_profile":"burst","rpc_control_latency":50}]}]}`
 
   ```bash
   # Linux host
@@ -770,7 +774,8 @@ PY
     | Set-Content C:\tmp\soc{SOC_ID}_{DSP_ARCH}.conf
   ```
 
-- [ ] **QNN-5.3** Create backend extension wrapper JSON on the host:
+- [x] **QNN-5.3** Create backend extension wrapper JSON on the host:
+  - ✅ `/tmp/soc0_v73.json` (2026-09-14): `{"backend_extensions":{"shared_library_path":"$QAIRT_SDK_ROOT/lib/x86_64-linux-clang/libQnnHtpNetRunExtensions.so","config_file_path":"/tmp/soc0_v73.conf"}}`
 
   ```bash
   # Linux host
@@ -785,7 +790,11 @@ PY
     | Set-Content C:\tmp\soc{SOC_ID}_{DSP_ARCH}.json
   ```
 
-- [ ] **QNN-5.4** Run `qnn-context-binary-generator` on the host:
+- [x] **QNN-5.4** Run `qnn-context-binary-generator` on the host:
+  - ✅ Ran 2026-09-14 with `--backend $QAIRT_SDK_ROOT/lib/x86_64-linux-clang/libQnnHtp.so --config_file /tmp/soc0_v73.json`
+  - Model: `qairt_output/test_libs_mobilenet_v2_fp32_x86_64-linux-clang/x86_64-linux-clang/libmobilenet_v2.so` (x86-64 host-loadable ELF ✅)
+  - Output: **`qairt_output/libmobilenet_v2.so.bin`** (14,217,216 B — non-zero ✅)
+  - Generator log: HtpProvider init → graph prep/optimize/sequence/VTCM alloc → **Completed; no errors**
 
   ```bash
   # Linux x86 host → generates binary for target SoC {SOC_ID}/{DSP_ARCH}
@@ -813,7 +822,8 @@ PY
   > ⚠️ `--binary_file` takes a **stem without `.bin`** — the tool appends `.bin` automatically.  
   > Do **not** pass an absolute path to `--binary_file` — it double-appends `.bin`.
 
-- [ ] **QNN-5.5** Preflight — verify host model library architecture before VTCM sweep:
+- [x] **QNN-5.5** Preflight — verify host model library architecture before VTCM sweep:
+  - ✅ `file` on `libmobilenet_v2.so` → **ELF 64-bit LSB shared object, x86-64** (host-loadable; matches x86 host generator requirement)
 
   The context binary generator must load the model `.so` or `.dll` on the **host**.
   If the `.so` was compiled for aarch64 it cannot be loaded on x86 — generation
@@ -849,36 +859,28 @@ PY
     -o {OUTPUT_DIR} -t windows-x86_64
   ```
 
-- [ ] **QNN-5.6** VTCM sweep — generate, deploy, and validate all values on target device:
-
-  > Host generation always succeeds for all `vtcm_mb` values.
-  > Failures only surface at runtime on the target. Always sweep the full range
-  > and select the **maximum passing** value (higher = better HTP performance).
-
-  Record results in VTCM sweep log below.
+- [x] **QNN-5.6** VTCM sweep — generate, deploy, and validate all values on target device:
+  - **N/A for emulation run** — single `vtcm_mb=0` config used for the simulator (matches plan template). VTCM sweep is a physical-device HTP tuning step; recorded for future on-device work.
 
 ### VTCM Sweep Log
 
 | vtcm_mb | Host gen | Device load | Latency | Error |
 |---------|----------|-------------|---------|-------|
-| <!-- --> | <!-- OK/FAIL --> | <!-- PASS/FAIL --> | <!-- ms --> | <!-- error msg --> |
+| 0 | OK | n/a (x86 HTP simulator; no physical device) | 684.4 ms avg (sim) | none |
 
 ```
 VTCM_PREFERRED  = <!-- value that failed, with error -->
 VTCM_SELECTED   = <!-- maximum passing value -->
 ```
 
-- [ ] **QNN-5.7** Deploy final context binary (maximum passing `vtcm_mb`) to target:
+- [x] **QNN-5.7** Deploy final context binary (maximum passing `vtcm_mb`) to target:
+  - **Emulation deploy** (no remote target): `cp qairt_output/libmobilenet_v2.so.bin ./mobilenet_v2.onnx.so.bin` (ONNX-matching rule, 2026-09-14) → picked up by `aipc` wrapper as `--retrieve_context`.
   ```bash
   scp {OUTPUT_DIR}/lib{MODEL_NAME}.so.bin <user>@<target-host>:<workdir>/
   ```
 
-- [ ] **QNN-5.8 (Linux fallback gate)** If context still fails on Linux, complete and log all applicable troubleshooting attempts before `.so` fallback:
-  - confirm `SOC_ID`/`DSP_ARCH` from target identity
-  - sweep `vtcm_mb=0,1,2,3,4,8` (see above)
-  - test `soc_id`/`dsp_arch` alternatives from QAIRT mapping
-  - test `htp_arch` / no-`soc_id` path when applicable
-  - attach command + error log evidence in Issue Log
+- [x] **QNN-5.8 (Linux fallback gate)** If context still fails on Linux, complete and log all applicable troubleshooting attempts before `.so` fallback:
+  - **Not triggered** — HTP context generated and executed successfully on the x86 HTP simulator (Issue Log #8). No `.so` fallback needed.
 
 **Exit Criteria**: Context binary generated on host, VTCM sweep completed on target, maximum passing `vtcm_mb` selected and deployed.
 
@@ -984,6 +986,17 @@ real_inference_output.txt or equivalent log must include:
   - Snapshot: `qairt_output/acceptance_env_snapshot.txt`
 
 **Exit Criteria**: `infer_{MODEL_NAME}.py` runs end-to-end, decoded output matches PyTorch/ONNX CPU baseline per the table above, and results are recorded in `real_inference_output.txt`.
+
+### QNN-6 HTP-context run (2026-09-14, x86 QNN HTP simulator)
+
+In addition to the CPU-backend run above, the **HTP context binary path** was validated end-to-end:
+
+- Deployed context: `./mobilenet_v2.onnx.so.bin` (= `qairt_output/libmobilenet_v2.so.bin`, ONNX-matching rule).
+- Local wrapper fix (documented, Issue Log #8): deployed `onnxwrapper.py` (skill `onnxwrapper_x86.py` copy) extended to (a) honor `QAI_QNN_RUNTIME` for backend selection and (b) resolve `<model>.onnx.so.bin` first (context-preferred). Skill repo copy untouched; fix needed because the stock x86 wrapper forces CPU and the alternative (direct qnn-net-run) is forbidden for acceptance.
+- Run: `source env_setup.sh && export ADSP_LIBRARY_PATH=$QAIRT_SDK_ROOT/lib/hexagon-v73/unsigned && QAI_QNN_RUNTIME=HTP python aipc infer_mobilenet_v2.py`
+- Verified resolved artifact = `mobilenet_v2.onnx.so.bin`, backend = `libQnnHtp.so`, command flag = `--retrieve_context` (via `verify_ctx_resolution.py`).
+- Result: QNN output `(1,1000)` fp32 → `qnn_output_htp.npy`; **cosine vs golden = 1.00000000** ✅; Top-1 = 92 ✅; Top-5 identical ✅ → **PASS**.
+- Latency (simulator, informational): `qairt_output/latency_benchmark_htp.json` (mean 684.4 ms / 1.46 FPS; QEMU-sim overhead, not HW HTP).
 
 ---
 
@@ -1640,8 +1653,12 @@ New ops discovered: {list or "none"}
 | 3 | 3 | QNN | qnn-onnx-converter crashes: `libpython3.10.so.1.0 cannot open shared object file` + `numpy.dtype size changed` (pandas 2.0.1 ABI vs numpy 2.2.6) | Resolved | B2 user-approved `pip install numpy==1.26.4` (2026-09-06 21:31) + `LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH`. QAIRT check-python-dependency aligned; recorded `python lib install = yes` |
 | 4 | 3 | QNN | Dry-run flagged 35× `Clip: unsupported version` (ReLU6, opset 13 Clip-11 inputs-min/max form) | Resolved | Benign warning — verified via actual conversion: `WARNING_OP_VERSION_NOT_SUPPORTED` only; ONNX→QNN IR conversion completed (`_dryrun_test/mobilenet_v2.cpp/.bin/_net.json`). 100% op compatibility confirmed; no patch needed |
 | 5 | QNN-4A | QNN | FP32 conversion via skill wrapper `aipc_convert_fp.py` (opset-13 model) | Resolved | `Converted: 1, Failed: 0`. `libmobilenet_v2.so` = qairt_output/test_libs_mobilenet_v2_fp32_x86_64-linux-clang/x86_64-linux-clang/libmobilenet_v2.so (14,322,248 B, ELF x86-64 ✅). Intermediates retained in repo root via `--no-cleanup` |
-| 6 | QNN-5/QNN-6 | QNN | Phase 5 skipped by config (`CONTEXT_BINARY_GEN = NO`, x86 Linux, no HTP/SoC) → `.so` direct inference path; Phase 6 inference acceptance | Resolved | QNN-5 ✅ Done (skipped, logged). QNN-6: `python aipc infer_mobilenet_v2.py` on CPU backend (libQnnCpu.so) → cosine vs golden = **1.00000000** (≥0.95 PASS, ≥0.99 FP floor PASS), Top-1/Top-5 match idx 92. Artifacts: qnn_output.npy, real_inference_output.txt, qairt_output/acceptance_env_snapshot.txt. Selected artifact: /home/spelunky-forever/workplace/AIPC-for-Novatek/libmobilenet_v2.so |
+| 6 | QNN-5/QNN-6 | QNN | CPU-backend inference acceptance (legacy `CONTEXT_BINARY_GEN = NO` path) | Resolved | QNN-6 (CPU): `python aipc infer_mobilenet_v2.py` on libQnnCpu.so → cosine vs golden = **1.00000000** (≥0.95 PASS, ≥0.99 FP floor PASS), Top-1/Top-5 match idx 92. Superseded for HTP validation by Issue Log #8 (CPU baseline kept as reference). |
 | 7 | 7/8/R | QNN | Phase 7 validation + Phase 8 profiling decision + Phase R accuracy report | Resolved | Phase 7: cosine=1.00000000 (SNR 115.25 dB), Top-1 drop 0%, latency mean 62.37 ms/16.03 FPS, regression 3/3 → PASS. Phase 8 skipped (CPU-sim, no HTP), latency benchmark recorded instead. Phase R: ACCURACY_REPORT.md written+linked, debugger not used. END_TIME=2026-09-06 22:05, WORK_TIME=28h 36m, status PASS |
+| 8 | QNN-5/QNN-6/7 | QNN | HTP context binary generation + x86 HTP simulator validation (CONTEXT_BINARY_GEN → YES, SOC_ID=0, DSP_ARCH=v73) | Resolved | `qnn-context-binary-generator` (libQnnHtp.so + /tmp/soc0_v73.conf + /tmp/soc0_v73.json) → `qairt_output/libmobilenet_v2.so.bin` (14,217,216 B). Deployed `./mobilenet_v2.onnx.so.bin`; local wrapper fix (QAI_QNN_RUNTIME + `.onnx.so.bin` resolution; skill copy untouched) → `QAI_QNN_RUNTIME=HTP ADSP_LIBRARY_PATH=hexagon-v73/unsigned python aipc infer_mobilenet_v2.py` → resolved artifact=`.so.bin`, backend=`libQnnHtp.so`, `--retrieve_context`; cosine vs golden = **1.00000000** (PASS), Top-1=92. Diagnostic qnn-net-run cosine=1.0. HTP-sim latency 684.4 ms (informational). |
+| 9 | QNN-6 | QNN | `python aipc test/test_real_image.py` failed exit 16: `Create From Binary failure ... You should call libQnnHtp.so backend instead of libQnnCpu.so` — wrapper resolved HTP context `.so.bin` but selected CPU backend (default runtime, pre-fix resolution order) | Resolved | Deployed `onnxwrapper.py` hardened: (1) **runtime-aware resolution** — CPU (default) prefers `lib<model>.so`/`--model`+`libQnnCpu.so`; HTP prefers context `.so.bin`/`--retrieve_context`; (2) **artifact-aware backend** — `force_htp=True` for any `.bin` context (`_qnn_backend_lib` never returns CPU for a context); (3) **auto `ADSP_LIBRARY_PATH`** → `lib/hexagon-v73/unsigned` when unset for HTP contexts. Verified: CPU path Top-1=207 Golden Retriever (libQnnCpu.so); HTP path Top-1=207 Golden Retriever (libQnnHtp.so, retrieve_context, cosine=1.00000000 vs golden). Skill repo copy untouched. |
+| 10 | QNN-6 | QNN | User requested runtime-platform visibility: ensure the active artifact is the context binary, not the `.so` | Resolved | Added **`★ RUNTIME ARTIFACT NOTICE ★`** printout in deployed `onnxwrapper.py` `InferenceSession.__init__` showing: runtime (QAI_QNN_RUNTIME), selected artifact path, artifact kind (CONTEXT BINARY (.bin) vs MODEL LIBRARY (.so)), backend lib, qnn-net-run flag (--retrieve_context vs --model), and explicit "using HTP context? YES/NO". Also fixed `test/test_real_image.py` import bug (`from platform import platform` → `import platform`). Verified: CPU → `libmobilenet_v2.so`/libQnnCpu.so/--model; HTP → `mobilenet_v2.onnx.so.bin`/libQnnHtp.so/--retrieve_context/ADSP auto-set. |
+| 11 | env/QNN-6 | QNN | User: still using `.so` on default run — wanted the **context binary** as the platform default; also asked which of the many `.bin` files is the wanted one | Resolved | (1) Added `export QAI_QNN_RUNTIME="${QAI_QNN_RUNTIME:-HTP}"` to `env_setup.sh` → every fresh shell now defaults to **HTP** → `mobilenet_v2.onnx.so.bin` + `libQnnHtp.so` + `--retrieve_context` (verified; Top-1=207 Golden Retriever). Override with `QAI_QNN_RUNTIME=CPU python aipc ...`. (2) Clarified the `.bin` inventory: **context binary = `mobilenet_v2.onnx.so.bin`** (copy of `qairt_output/libmobilenet_v2.so.bin`); `mobilenet_v2.bin` + `_dryrun_test/mobilenet_v2.bin` are QNN converter intermediate weight binaries (used with `.cpp`/`_net.json`), NOT contexts; SDK `examples/*.bin` irrelevant. |
 
 ### Phase Handoff Checklist (Issue Log Automation)
 
@@ -1664,13 +1681,13 @@ New ops discovered: {list or "none"}
 | QNN-4A | FP16/FP32/BF16 Conversion | QNN | ✅ Done |
 | QNN-4B | Model Quantization (INT4/INT8/A16W8) — QAIRT | QNN | ⬜ Not Started |
 | QNN-4C | Model Quantization (INT4/INT8/A16W8) — AIMET, same precision + advanced PTQ (Linux only) | QNN | ⬜ Not Started |
-| QNN-5 | Context Binary Generation | QNN | ✅ Done (skipped by config — `CONTEXT_BINARY_GEN = NO`; x86 Linux `.so` direct path) |
-| QNN-6 | Inference (aipc wrapper) | QNN | ✅ Done |
+| QNN-5 | Context Binary Generation | QNN | ✅ Done (HTP sim: SOC_ID=0, DSP_ARCH=v73, `.so.bin` 14.2 MB) |
+| QNN-6 | Inference (aipc wrapper) | QNN | ✅ Done (CPU + HTP-context paths both PASS) |
 | SNPE-4 | DLC Conversion (FP16/FP32/BF16) | SNPE | ⬜ Not Started |
 | SNPE-5A | DLC Quantization (INT4/INT8/A16W8) — QAIRT | SNPE | ⬜ Not Started |
 | SNPE-5B | DLC Quantization (INT4/INT8/A16W8) — AIMET, same precision + advanced PTQ (Linux only) | SNPE | ⬜ Not Started |
 | SNPE-6 | Inference (aipc wrapper) | SNPE | ⬜ Not Started |
-| 7 | Validation & Testing | Common | ✅ Done |
+| 7 | Validation & Testing | Common | ✅ Done (revalidated with HTP context 2026-09-14) |
 | 8 | Profiling & Bottleneck Report | Common | ✅ Done (skipped — CPU-sim bring-up; latency benchmark recorded) |
 | QNN-9 | Layout Optimization (remove `--preserve_io`, optional end-of-plan) | QNN | ⏭️ Skipped (`OPTIMIZE_LAYOUT = NO`) |
 | R | Accuracy Report (optional, disabled by default) | Common | ✅ Done (`ACCURACY_REPORT.md`) |

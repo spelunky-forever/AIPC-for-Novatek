@@ -4,8 +4,9 @@
 |---|---|
 | Report path | `ACCURACY_REPORT.md` (this file) |
 | Validation status | ✅ **PASS** |
-| Main raw tensor metric | cosine = **1.00000000**, SNR = **115.25 dB** (QNN vs PyTorch golden) |
+| Main raw tensor metric | cosine = **1.00000000**, SNR = **115.25 dB** (QNN vs PyTorch golden, CPU path) |
 | Task metric | Top-1 index match (92 == 92), Top-5 sets identical → **0% accuracy drop** |
+| HTP-context path (2026-09-14) | cosine = 1.00000000 vs golden via `mobilenet_v2.onnx.so.bin` + `libQnnHtp.so` on x86 HTP simulator (see REPORT §9) |
 | Profiling summary | n/a — CPU-sim bring-up; latency: mean 62.4 ms / 16.0 FPS (informational) |
 | Debugger backup used | **none** (AIPC wrapper acceptance only, per Phase R.4) |
 | Debugger artifacts | none |
@@ -66,8 +67,9 @@ applied (FP32); context binary not applicable (x86 Linux CPU, `CONTEXT_BINARY_GE
 
 ## 7. Known Limitations
 
-- Acceptance is on the **x86 Linux CPU simulation** path, not a Qualcomm HTP device.
-- Latency/FPS are informational and dominated by per-run process spawn in `onnxwrapper_x86`.
+- Acceptance is on the **x86 Linux CPU / HTP-simulator** paths, not a physical Qualcomm HTP device.
+- Latency/FPS are informational: CPU path is subprocess-spawn dominated (62 ms/16 FPS); HTP-sim path
+  uses the QEMU simulator (684 ms/1.46 FPS) — neither is hardware HTP performance.
 - Accuracy is verified against the PyTorch golden on one deterministic bring-up input
   (no full ImageNet evaluation); task metric = Top-1/Top-5 index match.
 

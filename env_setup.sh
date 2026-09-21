@@ -35,4 +35,9 @@ fi
 
 export QAIRT_DEVICE_BIN
 export PATH="${QAIRT_SDK_ROOT}/bin/${QAIRT_DEVICE_BIN}:${PATH}"
+
+# Default runtime: HTP context binary (CONTEXT_BINARY_GEN = YES).
+# The deployed onnxwrapper resolves/executes mobilenet_v2.onnx.so.bin via libQnnHtp.so.
+# Override per-run with: QAI_QNN_RUNTIME=CPU python aipc ...  (uses libmobilenet_v2.so).
+export QAI_QNN_RUNTIME="${QAI_QNN_RUNTIME:-HTP}"
 echo "QAIRT 2.45.0 環境載入成功！"
