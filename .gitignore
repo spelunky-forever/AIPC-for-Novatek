@@ -1,4 +1,6 @@
 /toolchains
+/models
+/onnx_models
 __pycache__/
 *.py[cod]
 _dryrun_test/
@@ -6,6 +8,7 @@ qairt_output/
 *.so
 *.bin
 *.onnx
+*.onnx.data
 aipc
 *.npy
 real_inference_output.txt
