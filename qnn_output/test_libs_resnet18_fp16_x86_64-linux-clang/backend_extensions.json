@@ -1,0 +1,6 @@
+{
+    "backend_extensions": {
+        "shared_library_path": "/home/spelunky-forever/workplace/AIPC-for-Novatek/toolchains/qairt/2.45.0.260326/lib/x86_64-linux-clang/libQnnHtpNetRunExtensions.so",
+        "config_file_path": "/home/spelunky-forever/workplace/AIPC-for-Novatek/qnn_output/test_libs_resnet18_fp16_x86_64-linux-clang/htp_config_v73.json"
+    }
+}

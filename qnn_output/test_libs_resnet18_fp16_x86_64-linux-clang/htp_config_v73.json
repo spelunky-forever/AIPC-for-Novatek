@@ -1,0 +1,19 @@
+{
+    "graphs": [
+        {
+            "graph_names": [
+                "resnet18"
+            ],
+            "O": 3
+        }
+    ],
+    "devices": [
+        {
+            "device_id": 0,
+            "soc_id": 77,
+            "soc_model": 77,
+            "dsp_arch": "v73",
+            "pd_session": "unsigned"
+        }
+    ]
+}

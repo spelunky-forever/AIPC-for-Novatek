@@ -1,5 +1,7 @@
 # Context Binary Generation (Linux x86 Host & ARM Linux Target)
 
+> **Note**: Weights are already embedded inside `lib<model>.so`. Do **NOT** search for an intermediate `.bin` file before running Context Binary Generation—the `.so.bin` / `.bin` is the **output** of this phase, not an input.
+
 Generates hardware-specific HTP context binaries (`.so.bin` / `.bin`) for Qualcomm NPU deployment.
 
 ---

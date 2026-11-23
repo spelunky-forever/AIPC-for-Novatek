@@ -1,0 +1,19 @@
+{
+    "graphs": [
+        {
+            "graph_names": [
+                "libresnet18"
+            ],
+            "O": 3
+        }
+    ],
+    "devices": [
+        {
+            "device_id": 0,
+            "soc_id": 117,
+            "soc_model": 117,
+            "dsp_arch": "v81",
+            "pd_session": "unsigned"
+        }
+    ]
+}

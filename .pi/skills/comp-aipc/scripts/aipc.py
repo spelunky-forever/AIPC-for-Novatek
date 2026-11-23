@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-aipc.py - Unified CLI Entrypoint for Qualcomm QAIRT Workflow (Linux x86 & ARM Linux)
+aipc.py - Unified CLI Entrypoint for Qualcomm QAIRT Workflow (ARM Linux & x86 Linux)
 """
 import argparse
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -11,6 +12,14 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_ENV_SETUP = "/home/spelunky-forever/workplace/AIPC-for-Novatek/env_setup.sh"
+
+
+def _is_arm64() -> bool:
+    return platform.machine().lower() in ("aarch64", "arm64")
+
+
+def _host_arch_dir() -> str:
+    return "aarch64-oe-linux-gcc11.2" if _is_arm64() else "x86_64-linux-clang"
 
 
 def _ensure_env() -> str:
@@ -33,16 +42,16 @@ def cmd_preflight(args):
         print(f"[FAIL] ONNX not found: {onnx_path}")
         sys.exit(1)
 
-    # 1. Check disk & /tmp space (prevents QAIRT external-data copy failure)
     tmp_dir = os.environ.get("QAIRT_TMP_DIR", "/tmp")
     tmp_free_gb = shutil.disk_usage(tmp_dir).free / (1024**3)
     work_free_gb = shutil.disk_usage(".").free / (1024**3)
+    print(f"[OK] Host Arch      = {platform.machine()} ({_host_arch_dir()})")
+    print(f"[OK] Python Version = {sys.version.split()[0]}")
     print(f"[OK] QAIRT_SDK_ROOT = {sdk}")
-    print(f"[INFO] Temp dir ({tmp_dir}) free: {tmp_free_gb:.1f} GB | Workdir free: {work_free_gb:.1f} GB")
+    print(f"[INFO] Temp ({tmp_dir}) free: {tmp_free_gb:.1f} GB | Workdir free: {work_free_gb:.1f} GB")
     if tmp_free_gb < 2.0:
-        print("[WARN] Low /tmp space! Set 'export QAIRT_TMP_DIR=/path/with/space' for large models.")
+        print("[WARN] Low /tmp space! Set 'export QAIRT_TMP_DIR=\"$PWD/qairt_tmp\"' for large models.")
 
-    # 2. Path-based ONNX check (safe for >2GB models)
     import onnx
     onnx.checker.check_model(str(onnx_path))
     m = onnx.load(str(onnx_path), load_external_data=False)
@@ -57,7 +66,7 @@ def cmd_inspect(args):
     sdk = _ensure_env()
     onnx_path = str(Path(args.onnx).resolve())
     subprocess.run([sys.executable, str(SCRIPT_DIR / "qai_inspect_onnxio.py"), onnx_path], check=True)
-    converter = Path(sdk) / "bin" / "x86_64-linux-clang" / "qnn-onnx-converter"
+    converter = Path(sdk) / "bin" / _host_arch_dir() / "qnn-onnx-converter"
     if converter.exists():
         print("\n[INFO] Running qnn-onnx-converter --dry_run ...")
         subprocess.run([str(converter), "--input_network", onnx_path, "--dry_run"])
@@ -72,7 +81,8 @@ def cmd_convert(args, extra):
 
 def cmd_ctxbin(args, extra):
     _ensure_env()
-    cmd = [sys.executable, str(SCRIPT_DIR / "qai_dev_gen_contextbin_x86.py")] + extra
+    ctx_script = "qai_dev_gen_contextbin.py" if _is_arm64() else "qai_dev_gen_contextbin_x86.py"
+    cmd = [sys.executable, str(SCRIPT_DIR / ctx_script)] + extra
     sys.exit(subprocess.run(cmd).returncode)
 
 
@@ -89,7 +99,7 @@ def main():
     p_init.add_argument("project_dir")
     p_init.set_defaults(func=cmd_init)
 
-    p_pre = sub.add_parser("preflight", help="Check SDK, /tmp space, and ONNX (>2GB safe)")
+    p_pre = sub.add_parser("preflight", help="Check SDK, Python version, /tmp space, and ONNX (>2GB safe)")
     p_pre.add_argument("onnx")
     p_pre.set_defaults(func=cmd_preflight)
 
@@ -98,10 +108,10 @@ def main():
     p_ins.set_defaults(func=cmd_inspect)
 
     p_conv = sub.add_parser("convert", help="Run conversion/quantization (forwards flags to run_pipeline.py)")
-    p_conv.add_argument("--so-flow", action="store_true", help="Use legacy .cpp/.so flow (qai_convert_fp.py) instead of DLC flow")
+    p_conv.add_argument("--so-flow", action="store_true", help="Use .cpp/.so flow (qai_convert_fp.py) instead of DLC flow")
     p_conv.set_defaults(func=cmd_convert)
 
-    p_ctx = sub.add_parser("ctxbin", help="Generate host-side context binary (forwards flags to qai_dev_gen_contextbin_x86.py)")
+    p_ctx = sub.add_parser("ctxbin", help="Generate context binary (uses native generator on ARM64)")
     p_ctx.set_defaults(func=cmd_ctxbin)
 
     p_inf = sub.add_parser("infer", help="Run inference script through qai wrapper")

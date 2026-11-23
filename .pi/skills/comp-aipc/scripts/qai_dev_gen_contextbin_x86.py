@@ -246,6 +246,21 @@ def _normalize_binary_basename(output_path: str | None, input_path: str) -> str:
         name = name[:-4]
     return name
 
+def _infer_model_lib_graph_name(model_path: str) -> str:
+    """Derive the QNN graph name from a compiled model library filename.
+
+    On Linux, ``qnn-model-lib-generator`` prefixes shared libraries with ``lib``
+    (e.g. ``resnet18.cpp`` -> ``libresnet18.so``), whereas the internal QNN
+    graph name remains ``resnet18``. Strip the standard ``lib`` prefix for
+    ``.so`` files so ``graph_names`` in the generated HTP config matches the
+    compiled graph.
+    """
+    p = Path(model_path)
+    stem = p.stem
+    if p.suffix.lower() == ".so" and stem.startswith("lib") and len(stem) > 3:
+        return stem[3:]
+    return stem
+
 
 def run_generator(
     model_path: str | None = None,
@@ -348,7 +363,7 @@ def run_generator(
                       "explicit --config_file instead.")
                 sys.exit(2)
         else:
-            graph_names = [Path(input_for_naming).stem]
+            graph_names = [_infer_model_lib_graph_name(input_for_naming)]
         effective_config = _write_htp_config(
             sdk_root, cfg_dir, graph_names, is_windows,
             vtcm_mb, soc_model, dsp_arch, opt_level, pd_session,

@@ -1,11 +1,25 @@
 ---
-name: aipc-toolkit
-description: AIPC (AI Porting Conversion). Convert, quantize, compile context binaries, patch unsupported operators, and run inference for PyTorch/ONNX models on Qualcomm platforms (QNN / SNPE / QAIRT).
+name: comp-aipc
+description: AIPC (AI Porting Conversion). Initialize/init/setup project, convert, quantize, compile context binaries, patch unsupported operators, and run inference for PyTorch/ONNX models on Qualcomm platforms (QNN / SNPE / QAIRT).
 ---
 
 # AIPC Toolkit (Qualcomm QAIRT — Linux x86 & ARM Linux)
 
-Use the scripts bundled inside this skill directory (`scripts/`). Resolve paths relative to this skill root, not the working directory. Prefer the unified entrypoint `python scripts/aipc.py <subcommand>` (or bundled `qai_*.py` wrappers) over raw SDK CLIs unless explicitly required.
+**CRITICAL EXECUTION RULE (DO NOT READ SCRIPTS):**
+- Treat all files in `.pi/skills/comp-aipc/scripts/` and root `aipc.py` as **black-box CLI tools**.
+- **NEVER read, inspect, or `cat` the source code of `scripts/*.py` or `$QAIRT_SDK_ROOT`** unless the user explicitly asks you to debug or modify a script. Run `--help` only if a flag is unclear.
+- **NEVER survey `references/` unless the current step explicitly requires one.**
+
+## 0. Immediate Action on "Init" / New Project
+
+When the user asks to initialize or create a project:
+1. If `<project_dir>` was not specified in the prompt, **ask the user for the target project folder name** (e.g., `projects/<model_name>`) before doing anything else—do not scan the repository.
+2. Once `<project_dir>` is known, **immediately run the setup script** without reading any files first:
+   ```bash
+   python3 .pi/skills/comp-aipc/scripts/qai_project_setup.py <project_dir>
+   ```
+   *(Or `python3 aipc.py init <project_dir>` if `init` is wired in root `aipc.py`.)*
+3. After `AGENTS.md`, `CLAUDE.md`, and `plan.md` are generated in `<project_dir>`, read `<project_dir>/plan.md` and ask the user to confirm the `Config` variables (`MODEL_NAME`, `FLOW`, `PRECISION`, `TARGET_DEVICE`, `CALIBRATION_DATA`).
 
 ## 1. Choose The Route First
 
@@ -20,6 +34,10 @@ Use the scripts bundled inside this skill directory (`scripts/`). Resolve paths 
    - Always activate the Conda + QAIRT SDK environment before running any tool:
      `source /home/spelunky-forever/workplace/AIPC-for-Novatek/env_setup.sh`
    - Never run `pip install` without explicit user permission (Blocking Condition B2).
+   - Every bash command runs in a **fresh subshell** — ALWAYS prepend `source /home/spelunky-forever/workplace/AIPC-for-Novatek/env_setup.sh && ` to every shell command. Never manually `export QAIRT_SDK_ROOT` in place of `env_setup.sh`.
+   - **NEVER edit or modify `env_setup.sh`.**
+   - **NEVER create new conda environments** (`conda create`), modify `env_setup.sh`, or upgrade `numpy` / `onnx`. QAIRT 2.45.0 requires `"numpy<2"` (`1.26.4`) and `"onnx<1.19"` (`1.17.0`, required for `onnx.version.version`).
+   - **NEVER install NumPy 2.x** — QAIRT 2.45.0 C++ extensions require `"numpy<2"` (e.g. `numpy==1.26.4`).
 2. **Disk & Memory Check Before Conversion**:
    - Check `df -h /tmp` and `free -h` before calling converters. If `/tmp` space is less than 2× the model weight size, set `export QAIRT_TMP_DIR="$PWD/qairt_tmp" && mkdir -p "$QAIRT_TMP_DIR"`.
    - Warn the user if available RAM is less than 2× the model file size.
@@ -27,6 +45,8 @@ Use the scripts bundled inside this skill directory (`scripts/`). Resolve paths 
    - **Model library (`.so`)** must match the **host/target Python process architecture** (`x86_64-linux-clang` on x86 host; `aarch64-ubuntu-gcc9.4` only if cross-compiling `.so` for direct ARM execution without a context binary).
    - **Context binary (`.so.bin` / `.bin`)** is compiled offline on the **Linux x86 host** for the target SoC using mandatory `{SOC_ID}` and `{DSP_ARCH}` from `scripts/_soc_targets.py` (never read Linux kernel `/sys/devices/soc0/soc_id` or `$PRODUCT_SOC`).
    - Context binary is optional on ARM Linux (`.so` fallback allowed only after exhausting `references/context_binary.md` troubleshooting).
+   - **Script Invocation**: ALWAYS run skill scripts via `python <script>.py` (never execute `.py` files directly or run `chmod +x` on them). On x86 Linux hosts, always use `qai_dev_gen_contextbin_x86.py` with `--model <path/to/lib.so> --output <out.bin> --soc_model <id> --dsp_arch <arch>`.
+   - **No Guessing CLI Tools**: Only invoke QAIRT binaries that actually exist under `$QAIRT_SDK_ROOT/bin/x86_64-linux-clang/` (such as `qairt-converter`, `qnn-onnx-converter`, `qnn-context-binary-generator`, `qnn-context-binary-utility`).
 4. **Operator Patching**:
    - Patch in-memory or via ONNX surgery; never edit installed library source files (`site-packages`).
    - Never fall back to CPU (`libQnnCpu.so`) as a workaround for unsupported HTP operators. Iterate patching until all ops compile on HTP, or escalate if no replacement pattern exists (B3) or semantics change (B4).
