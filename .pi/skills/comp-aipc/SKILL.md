@@ -1,5 +1,5 @@
 ---
-name: aipc-toolkit
+name: comp-aipc
 description: AIPC (AI Porting Conversion). Convert, quantize, compile context binaries, patch unsupported operators, and run inference for PyTorch/ONNX models on Qualcomm platforms (QNN / SNPE / QAIRT).
 ---
 

@@ -107,7 +107,7 @@ PATCH_ITERATIONS = <!-- 0 -->
 
 - [ ] **2.1** Export `{MODEL_NAME}` to `{ONNX_FILE}` (`opset_version >= 13`) via `export_onnx.py` (using adapted model from Phase 1 if applicable).
 - [ ] **2.2** Validate & simplify: `onnx.checker.check_model("{ONNX_FILE}")` and `python -m onnxsim {ONNX_FILE} {ONNX_FILE}`.
-- [ ] **3.1** Inspect I/O: `python skills/aipc-toolkit/scripts/qai_inspect_onnxio.py {ONNX_FILE}` → update `INPUT_NAME`, `INPUT_SHAPE`, `OUTPUT_NAMES` and keep `{MODEL_NAME}.yaml`.
+- [ ] **3.1** Inspect I/O: `python skills/comp-aipc/scripts/qai_inspect_onnxio.py {ONNX_FILE}` → update `INPUT_NAME`, `INPUT_SHAPE`, `OUTPUT_NAMES` and keep `{MODEL_NAME}.yaml`.
 - [ ] **3.2** Run dry-run (`qnn-onnx-converter --input_network {ONNX_FILE} --dry_run` or `qairt-converter ... --dry_run`).
 - [ ] **3.3** **If unsupported ops found**: Patch via Decision Tree (1: In-memory module → 2: Custom symbolic → 3: ONNX surgery) → re-export → verify `onnx.checker` + `--dry_run` + Cosine ≥ 0.95. Repeat until clean; log all patched ops in Issue Log.
 
@@ -121,7 +121,7 @@ PATCH_ITERATIONS = <!-- 0 -->
 
 - [ ] **QNN-4A.1** Convert & compile model library:
   ```bash
-  python skills/aipc-toolkit/scripts/qai_convert_fp.py \
+  python skills/comp-aipc/scripts/qai_convert_fp.py \
     --onnx {ONNX_FILE} --output-root {OUTPUT_DIR} \
     --precision <!-- 16 or 32 --> --preserve-io-mode datatype --target-arch {TARGET_ARCH}
   ```
@@ -131,7 +131,7 @@ PATCH_ITERATIONS = <!-- 0 -->
 
 - [ ] **QNN-4B.1** Run QAIRT quantization (`ACT_BITWIDTH`: 8 for INT8, 16 for A16W8; `WEIGHT_BITWIDTH`: 8):
   ```bash
-  python skills/aipc-toolkit/scripts/qai_convert_int.py \
+  python skills/comp-aipc/scripts/qai_convert_int.py \
     --input_network {ONNX_FILE} --input_list {CALIB_LIST} \
     --output-root {OUTPUT_DIR} --act_bw {ACT_BITWIDTH} --weight_bw {WEIGHT_BITWIDTH} \
     --preserve-io-mode datatype --target-arch {TARGET_ARCH}
@@ -174,7 +174,7 @@ PATCH_ITERATIONS = <!-- 0 -->
 - [ ] **QNN-6.1** **Wrapper Preflight**: Quarantine stale `*.bin` files in workdir; place `{MODEL_NAME}.yaml` alongside `{ONNX_FILE}`; copy context binary as `{MODEL_NAME}.onnx.so.bin` (Linux) or `{MODEL_NAME}.onnx.dll.bin` (Windows).
 - [ ] **QNN-6.2** Implement `infer_{MODEL_NAME}.py` (preprocessing + postprocessing) and execute via skill wrapper:
   ```bash
-  python skills/aipc-toolkit/scripts/qai infer_{MODEL_NAME}.py
+  python skills/comp-aipc/scripts/qai infer_{MODEL_NAME}.py
   ```
 - [ ] **QNN-6.3** Verify raw tensor Cosine (≥ 0.99 FP / ≥ 0.95 INT) AND decoded task output (labels, boxes, transcript, or generated tokens) against ONNX CPU baseline.
 
@@ -184,7 +184,7 @@ PATCH_ITERATIONS = <!-- 0 -->
 
 - [ ] **SNPE-4** Convert ONNX to FP DLC:
   ```bash
-  python skills/aipc-toolkit/scripts/qai_convert_snpe.py \
+  python skills/comp-aipc/scripts/qai_convert_snpe.py \
     --onnx {ONNX_FILE} --output {OUTPUT_DIR}/{MODEL_NAME}.dlc --precision <!-- fp16 or fp32 -->
   ```
 - [ ] **SNPE-5** *(Optional, INT only)* Quantize DLC via `qairt-quantizer` (or convert AIMET `.onnx` + `.encodings` via `snpe-onnx-to-dlc --quantization_overrides`):
@@ -193,7 +193,7 @@ PATCH_ITERATIONS = <!-- 0 -->
     --output_dlc {OUTPUT_DIR}/{MODEL_NAME}_quantized.dlc --input_list {CALIB_LIST} \
     --param_quantizer tf --act_quantizer tf --act_bitwidth {ACT_BITWIDTH} --weights_bitwidth {WEIGHT_BITWIDTH}
   ```
-- [ ] **SNPE-6** Run inference via `python skills/aipc-toolkit/scripts/qai infer_{MODEL_NAME}.py` and validate raw + decoded output parity.
+- [ ] **SNPE-6** Run inference via `python skills/comp-aipc/scripts/qai infer_{MODEL_NAME}.py` and validate raw + decoded output parity.
 
 ---
 
