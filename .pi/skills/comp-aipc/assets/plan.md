@@ -10,15 +10,20 @@
 ## Config
 
 ```text
-PROJECT_NAME     = <!-- project name -->
-MODEL_NAME       = <!-- model identifier, e.g. yolov8n, whisper-tiny -->
+PROJECT_NAME     = 
+MODEL_NAME       = 
 QAIRT_ENV_SETUP  = /home/spelunky-forever/workplace/AIPC-for-Novatek/env_setup.sh
-QAIRT_ROOT       = <!-- derived from $QAIRT_SDK_ROOT after sourcing QAIRT_ENV_SETUP -->
+QAIRT_ROOT       = /home/spelunky-forever/workplace/AIPC-for-Novatek
 
 FLOW             = <!-- QNN (default) | SNPE -->
 SRC_FRAMEWORK    = <!-- PyTorch (default) | ONNX -->
-HOST_DEVICE      = <!-- X86 LINUX | ARM WIN | ARM LINUX -->
-TARGET_DEVICE    = <!-- ARM Linux (QCOM) | ARM WIN (QCOM) | x86 Linux -->
+HOST_DEVICE      = X86 LINUX
+CONTEXT_BINARY_GEN = YES
+HOST_DEVICE        = X86 LINUX
+HOST_ARCH          = x86_64-linux-clang
+TARGET_ARCH        = x86_64-linux-clang
+SOC_ID        = 0 
+DSP_ARCH      = v73 
 
 PRECISION        = <!-- FP16 (default) | FP32 | INT8 | A16W8 | INT4 | A8W4 -->
 QUANT_TOOL       = <!-- QAIRT (default) | AIMET (Linux only, advanced PTQ) -->
@@ -33,12 +38,6 @@ CALIB_LIST       = <!-- calibration_list.txt (default) -->
 OUTPUT_DIR       = <!-- qairt_output (default) -->
 ONNX_FILE        = {MODEL_NAME}.onnx
 # For multi-component models (SD, Whisper, CLIP), use COMPONENTS + ONNX_DIR per references/complex_models.md
-
-# Derived toolchain values:
-# HOST_ARCH:   X86 LINUX -> x86_64-linux-clang | ARM WIN -> x86_64-windows-msvc | ARM LINUX -> aarch64-linux-gcc
-# TARGET_ARCH: ARM WIN -> windows-x86_64 | Linux + CONTEXT_BINARY_GEN=YES -> x86_64-linux-clang | ARM Linux (no ctx) -> aarch64-ubuntu-gcc9.4
-HOST_ARCH        = <!-- derived from HOST_DEVICE -->
-TARGET_ARCH      = <!-- derived from CONTEXT_BINARY_GEN and TARGET_DEVICE -->
 ```
 
 ---
