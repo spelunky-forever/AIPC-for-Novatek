@@ -19,7 +19,7 @@ Usage
 -----
 Run from the skill directory (do NOT copy this script to the project folder):
 
-    python skills/aipc-toolkit/scripts/qai_project_setup.py  [project_dir]  [options]
+    python skills/comp-aipc/scripts/qai_project_setup.py  [project_dir]  [options]
 
 Arguments
 ---------
@@ -48,7 +48,7 @@ AGENTS_TEMPLATE = SKILL_DIR / "assets" / "qai_AGENTS.md"
 PLAN_TEMPLATE = SKILL_DIR / "assets" / "plan.md"
 
 # Sentinel written into AGENTS.md so we can detect a previous attachment
-_AIPC_AGENTS_SENTINEL = "<!-- AIPC-TOOLKIT:AGENTS -->"
+_AIPC_AGENTS_SENTINEL = "<!-- comp-aipc:AGENTS -->"
 _CLAUDE_PROMPT_FILENAMES = ("CLAUDE.md",)
 
 _AGENTS_HEADER = f"""\n
@@ -56,7 +56,7 @@ _AGENTS_HEADER = f"""\n
 {_AIPC_AGENTS_SENTINEL}
 <!-- AIPC Toolkit Agent Definitions                                  -->
 <!-- Appended automatically by qai_project_setup.py                  -->
-<!-- Source: skills/aipc-toolkit/assets/qai_AGENTS.md               -->
+<!-- Source: skills/comp-aipc/assets/qai_AGENTS.md               -->
 <!-- ----------------------------------------------------------------->
 
 """
@@ -270,7 +270,7 @@ def main() -> None:
     print()
     print("Next steps:")
     print("  1. Open plan.md and fill in the Config section variables.")
-    print("  2. Activate the aipc-toolkit skill and follow the plan.")
+    print("  2. Activate the comp-aipc skill and follow the plan.")
     print("=" * 60)
 
 
